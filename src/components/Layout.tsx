@@ -147,7 +147,7 @@ export default function Layout() {
         .user-plan { font-size: 11px; color: var(--accent-light); }
         .main-content {
           flex: 1;
-          overflow-y: auto;
+          overflow: hidden;
           background: var(--bg-primary);
         }
       `}</style>

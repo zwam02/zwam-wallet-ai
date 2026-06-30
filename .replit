@@ -38,3 +38,6 @@ externalPort = 80
 deploymentTarget = "static"
 build = ["npm", "run", "build"]
 publicDir = "dist"
+
+[objectStorage]
+defaultBucketID = "replit-objstore-ee724e8f-e9f4-4d53-b224-dc53318f929c"

@@ -56,7 +56,8 @@ export default function Dashboard() {
             <h3>Flujo de Dinero</h3>
             <span className="badge">Últimos 6 meses</span>
           </div>
-          <ResponsiveContainer width="100%" height={220}>
+          <div className="chart-wrap">
+          <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyData}>
               <defs>
                 <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
@@ -78,6 +79,7 @@ export default function Dashboard() {
               <Area type="monotone" dataKey="gastos" stroke="#ef4444" strokeWidth={2} fill="url(#expenseGrad)" name="Gastos" />
             </AreaChart>
           </ResponsiveContainer>
+          </div>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }} className="recent-card">
@@ -86,7 +88,7 @@ export default function Dashboard() {
             <a href="/transactions" className="link-small">Ver todos</a>
           </div>
           <div className="tx-list">
-            {transactions.slice(0, 6).map((tx, i) => (
+            {transactions.slice(0, 5).map((tx, i) => (
               <motion.div key={tx.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.05 }} className="tx-item">
                 <div className="tx-dot" style={{ background: tx.type === 'income' ? 'var(--green)' : 'var(--red)' }} />
                 <div className="tx-info">
@@ -103,43 +105,59 @@ export default function Dashboard() {
       </div>
 
       <style>{`
-        .page { padding: 32px 36px; max-width: 1200px; }
-        .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; }
-        .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-        .page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
-        .btn-primary {
-          display: flex; align-items: center; gap: 7px;
-          background: var(--accent); color: white;
-          border: none; padding: 10px 18px; border-radius: 8px;
-          font-size: 13px; font-weight: 600; cursor: pointer;
+        .page {
+          height: 100vh;
+          padding: 16px 22px;
+          box-sizing: border-box;
+          display: grid;
+          grid-template-rows: auto auto 1fr;
+          gap: 10px;
+          overflow: hidden;
         }
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+        .page-header { display: flex; align-items: center; justify-content: space-between; }
+        .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+        .page-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+        .btn-primary {
+          display: flex; align-items: center; gap: 6px;
+          background: var(--accent); color: white;
+          border: none; padding: 7px 14px; border-radius: 8px;
+          font-size: 12px; font-weight: 600; cursor: pointer;
+        }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .stat-card {
           background: var(--bg-card); border: 1px solid var(--border);
-          border-radius: 12px; padding: 18px; display: flex; gap: 14px; align-items: flex-start;
+          border-radius: 10px; padding: 10px 12px; display: flex; gap: 10px; align-items: center;
         }
-        .stat-icon { width: 38px; height: 38px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .stat-body { display: flex; flex-direction: column; gap: 2px; }
-        .stat-label { font-size: 12px; color: var(--text-secondary); }
-        .stat-value { font-size: 22px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.5px; }
-        .stat-change { font-size: 11px; display: flex; align-items: center; gap: 2px; margin-top: 2px; }
-        .content-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+        .stat-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .stat-body { display: flex; flex-direction: column; gap: 1px; }
+        .stat-label { font-size: 10px; color: var(--text-secondary); }
+        .stat-value { font-size: 16px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; letter-spacing: -0.4px; line-height: 1.2; }
+        .stat-change { font-size: 10px; display: flex; align-items: center; gap: 2px; }
+        .content-grid {
+          display: grid;
+          grid-template-columns: 1.4fr 1fr;
+          gap: 8px;
+          min-height: 0;
+        }
         .chart-card, .recent-card {
           background: var(--bg-card); border: 1px solid var(--border);
-          border-radius: 12px; padding: 20px;
+          border-radius: 10px; padding: 12px 14px;
+          display: flex; flex-direction: column;
+          min-height: 0; overflow: hidden;
         }
-        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-        .card-header h3 { font-size: 15px; font-weight: 600; }
-        .badge { font-size: 11px; color: var(--text-secondary); background: var(--bg-secondary); padding: 3px 8px; border-radius: 20px; border: 1px solid var(--border); }
-        .link-small { font-size: 12px; color: var(--accent-light); text-decoration: none; }
-        .tx-list { display: flex; flex-direction: column; gap: 2px; }
-        .tx-item { display: flex; align-items: center; gap: 10px; padding: 9px 8px; border-radius: 7px; transition: background 0.15s; }
+        .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-shrink: 0; }
+        .card-header h3 { font-size: 13px; font-weight: 600; }
+        .badge { font-size: 10px; color: var(--text-secondary); background: var(--bg-secondary); padding: 2px 7px; border-radius: 20px; border: 1px solid var(--border); }
+        .link-small { font-size: 11px; color: var(--accent-light); text-decoration: none; }
+        .chart-wrap { flex: 1; min-height: 0; }
+        .tx-list { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+        .tx-item { display: flex; align-items: center; gap: 8px; padding: 8px 5px; border-radius: 6px; transition: background 0.15s; }
         .tx-item:hover { background: var(--bg-card-hover); }
-        .tx-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .tx-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
-        .tx-desc { font-size: 13px; font-weight: 500; }
-        .tx-cat { font-size: 11px; color: var(--text-dim); }
-        .tx-amount { font-size: 13px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+        .tx-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .tx-info { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .tx-desc { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tx-cat { font-size: 10px; color: var(--text-dim); }
+        .tx-amount { font-size: 12px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; flex-shrink: 0; }
       `}</style>
     </div>
   )
