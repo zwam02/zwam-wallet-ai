@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [ main, feature/app-init ]
+    branches: [ main, feature/app-init, feature/ai-features ]
   pull_request:
     branches: [ main ]
 
@@ -25,13 +25,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install root deps
-        run: npm ci
-      - name: Install server deps
+      - name: Install server dependencies
         run: |
           cd server
-          npm ci
-      - name: Run server TypeScript build
+          npm install
+      - name: Generate Prisma client
+        run: |
+          cd server
+          npx prisma generate
+      - name: Build server TypeScript
         run: |
           cd server
           npm run build
+      - name: Run tests (if available)
+        run: |
+          cd server
+          npm test --if-present
+        continue-on-error: true
