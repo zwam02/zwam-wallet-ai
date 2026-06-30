@@ -1,125 +1,183 @@
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Sparkles, TrendingUp, AlertTriangle, CheckCircle, Info, PieChart } from 'lucide-react'
-import { PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { aiInsights, categoryData } from '../data/mock'
-
-const iconMap = {
-  warning: { icon: AlertTriangle, color: 'var(--yellow)', bg: 'rgba(245,158,11,0.12)' },
-  success: { icon: CheckCircle, color: 'var(--green)', bg: 'rgba(34,197,94,0.12)' },
-  info: { icon: Info, color: 'var(--accent-light)', bg: 'var(--accent-dim)' },
-}
+import { PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
+import { useApp } from '../context/AppContext'
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2 })
 
+const PALETTE = ['#6c63ff', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#f97316', '#8b5cf6', '#14b8a6']
+
 export default function Insights() {
+  const { transactions } = useApp()
+
+  // Category breakdown from real data
+  const categoryData = useMemo(() => {
+    const map = new Map<string, number>()
+    transactions.filter(t => t.type === 'expense').forEach(t => {
+      map.set(t.category, (map.get(t.category) ?? 0) + t.amount)
+    })
+    return Array.from(map.entries())
+      .map(([name, value], i) => ({ name, value, color: PALETTE[i % PALETTE.length] }))
+      .sort((a, b) => b.value - a.value)
+  }, [transactions])
+
+  // Monthly bar data from real transactions
+  const monthlyData = useMemo(() => {
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+    const map = new Map<string, { ingresos: number; gastos: number }>()
+    transactions.forEach(t => {
+      const d = new Date(t.date)
+      const label = months[d.getMonth()]
+      const entry = map.get(label) ?? { ingresos: 0, gastos: 0 }
+      if (t.type === 'income') entry.ingresos += t.amount
+      else entry.gastos += t.amount
+      map.set(label, entry)
+    })
+    return months.filter(m => map.has(m)).map(m => ({ month: m, ...map.get(m)! }))
+  }, [transactions])
+
+  // Savings rate
+  const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const savingsRate = income > 0 ? Math.round(((income - expense) / income) * 100) : 0
+
+  // Subscriptions (recurring charges)
+  const subs = useMemo(() => transactions.filter(t =>
+    t.type === 'expense' && ['Netflix', 'Spotify', 'Gym', 'Amazon', 'Apple'].some(k => t.description.includes(k))
+  ), [transactions])
+
+  // AI Insights dynamically generated
+  const insights = useMemo(() => {
+    const list = []
+    if (savingsRate >= 20) {
+      list.push({ id: 'savings', type: 'success', title: 'Buen ritmo de ahorro', description: `Estás ahorrando el ${savingsRate}% de tus ingresos. ${savingsRate >= 30 ? '¡Excelente, superas la meta recomendada del 20%!' : 'Estás en buen camino.'}`, action: 'Ver billeteras' })
+    } else if (income > 0) {
+      list.push({ id: 'savings', type: 'warning', title: 'Tasa de ahorro baja', description: `Solo estás ahorrando el ${savingsRate}% de tus ingresos. Se recomienda al menos el 20%.`, action: 'Ver gastos' })
+    }
+
+    const topCat = categoryData[0]
+    if (topCat) {
+      const pct = income > 0 ? Math.round((topCat.value / income) * 100) : 0
+      list.push({ id: 'top-cat', type: pct > 40 ? 'warning' : 'info', title: `Mayor gasto: ${topCat.name}`, description: `Has gastado $${fmt(topCat.value)} en ${topCat.name} (${pct}% de tus ingresos).`, action: 'Ver movimientos' })
+    }
+
+    if (subs.length > 0) {
+      const subTotal = subs.reduce((s, t) => s + t.amount, 0)
+      list.push({ id: 'subs', type: 'warning', title: `${subs.length} suscripción${subs.length > 1 ? 'es' : ''} detectada${subs.length > 1 ? 's' : ''}`, description: `Total en suscripciones: $${fmt(subTotal)}/mes. Revisa si las usas todas.`, action: 'Ver suscripciones' })
+    }
+
+    if (income - expense > 1000) {
+      list.push({ id: 'invest', type: 'info', title: 'Oportunidad de inversión', description: `Tienes $${fmt(income - expense)} disponibles. Con un perfil moderado podrías generar 7-9% anual invirtiéndolos.`, action: 'Ver billeteras' })
+    }
+
+    if (list.length === 0) {
+      list.push({ id: 'empty', type: 'info', title: 'Agrega transacciones', description: 'Una vez que agregues más movimientos, el sistema generará recomendaciones personalizadas automáticamente.', action: 'Agregar transacción' })
+    }
+
+    return list
+  }, [transactions, categoryData, savingsRate, subs])
+
+  const iconMap = {
+    warning: { icon: AlertTriangle, color: 'var(--yellow)', bg: 'rgba(245,158,11,0.12)' },
+    success: { icon: CheckCircle, color: 'var(--green)', bg: 'rgba(34,197,94,0.12)' },
+    info: { icon: Info, color: 'var(--accent-light)', bg: 'var(--accent-dim)' },
+  }
+
+  // Health score
+  const score = Math.min(100, Math.max(0,
+    (savingsRate >= 20 ? 30 : Math.round(savingsRate * 1.5)) +
+    (expense < income ? 30 : 10) +
+    (subs.length <= 3 ? 20 : 10) +
+    (categoryData.length >= 3 ? 20 : 10)
+  ))
+
   return (
     <div className="page">
       <div className="page-header">
         <div>
           <h1 className="page-title">IA Insights</h1>
-          <p className="page-subtitle">Análisis inteligente de tus finanzas</p>
+          <p className="page-subtitle">Análisis en tiempo real · {transactions.length} transacciones</p>
         </div>
-        <div className="ai-badge">
-          <Sparkles size={13} />
-          <span>Actualizado ahora</span>
-        </div>
+        <div className="ai-badge"><Sparkles size={12} /><span>Actualizado</span></div>
       </div>
 
       <div className="insights-layout">
-        <div className="insights-col">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="section-title-row">
-            <Sparkles size={15} color="var(--accent-light)" />
-            <h3>Recomendaciones</h3>
-          </motion.div>
-          {aiInsights.map((insight, i) => {
-            const { icon: Icon, color, bg } = iconMap[insight.type as keyof typeof iconMap]
+        <div className="col-left">
+          <div className="section-label"><Sparkles size={13} color="var(--accent-light)" /><span>Recomendaciones</span></div>
+          {insights.map((ins, i) => {
+            const { icon: Icon, color, bg } = iconMap[ins.type as keyof typeof iconMap]
             return (
-              <motion.div
-                key={insight.id}
-                initial={{ opacity: 0, x: -16 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="insight-card"
-              >
-                <div className="insight-icon" style={{ background: bg, color }}>
-                  <Icon size={16} />
-                </div>
+              <motion.div key={ins.id} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }} className="insight-card">
+                <div className="insight-icon" style={{ background: bg, color }}><Icon size={15} /></div>
                 <div className="insight-body">
-                  <h4>{insight.title}</h4>
-                  <p>{insight.description}</p>
-                  <button className="insight-action">{insight.action} →</button>
+                  <h4>{ins.title}</h4>
+                  <p>{ins.description}</p>
                 </div>
               </motion.div>
             )
           })}
+
+          {monthlyData.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mini-card">
+              <div className="mini-header"><TrendingUp size={13} /><span>Ingresos vs Gastos por mes</span></div>
+              <ResponsiveContainer width="100%" height={140}>
+                <BarChart data={monthlyData} barSize={10}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'var(--text-dim)', fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }} formatter={(v: number) => [`$${fmt(v)}`, '']} />
+                  <Bar dataKey="ingresos" fill="#6c63ff" radius={[3, 3, 0, 0]} name="Ingresos" />
+                  <Bar dataKey="gastos" fill="#ef4444" radius={[3, 3, 0, 0]} name="Gastos" />
+                </BarChart>
+              </ResponsiveContainer>
+            </motion.div>
+          )}
         </div>
 
-        <div className="insights-col">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="pie-card">
-            <div className="section-title-row" style={{ marginBottom: 16 }}>
-              <PieChart size={15} color="var(--text-secondary)" />
-              <h3>Gastos por categoría</h3>
-            </div>
-            <ResponsiveContainer width="100%" height={220}>
-              <RechartsPie>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 13 }}
-                  formatter={(v: number) => [`$${fmt(v)}`, '']}
-                />
-              </RechartsPie>
-            </ResponsiveContainer>
-            <div className="legend">
-              {categoryData.map(d => (
-                <div key={d.name} className="legend-item">
-                  <span className="legend-dot" style={{ background: d.color }} />
-                  <span className="legend-name">{d.name}</span>
-                  <span className="legend-val">${fmt(d.value)}</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
+        <div className="col-right">
+          {categoryData.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="pie-card">
+              <div className="section-label"><PieChart size={13} /><span>Gastos por categoría</span></div>
+              <ResponsiveContainer width="100%" height={180}>
+                <RechartsPie>
+                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                    {categoryData.map((_, i) => <Cell key={i} fill={categoryData[i].color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} formatter={(v: number) => [`$${fmt(v)}`, '']} />
+                </RechartsPie>
+              </ResponsiveContainer>
+              <div className="legend">
+                {categoryData.slice(0, 6).map(d => (
+                  <div key={d.name} className="legend-item">
+                    <span className="legend-dot" style={{ background: d.color }} />
+                    <span className="legend-name">{d.name}</span>
+                    <span className="legend-val">${fmt(d.value)}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
 
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="score-card">
-            <div className="section-title-row" style={{ marginBottom: 12 }}>
-              <TrendingUp size={15} color="var(--text-secondary)" />
-              <h3>Salud Financiera</h3>
-            </div>
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="score-card">
+            <div className="section-label"><TrendingUp size={13} /><span>Salud Financiera</span></div>
             <div className="score-display">
-              <span className="score-num">82</span>
+              <span className="score-num" style={{ color: score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)' }}>{score}</span>
               <span className="score-label">/ 100</span>
             </div>
             <div className="score-bar-bg">
-              <motion.div className="score-bar-fill" initial={{ width: 0 }} animate={{ width: '82%' }} transition={{ delay: 0.5, duration: 1 }} />
+              <motion.div className="score-bar-fill" style={{ background: score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--yellow)' : 'var(--red)' }} initial={{ width: 0 }} animate={{ width: `${score}%` }} transition={{ delay: 0.5, duration: 0.9 }} />
             </div>
-            <div className="score-pillars">
+            <div className="pillars">
               {[
-                { label: 'Ahorro', val: 88 },
-                { label: 'Deuda', val: 95 },
-                { label: 'Inversión', val: 72 },
-                { label: 'Gasto', val: 74 },
+                { label: 'Ahorro', val: Math.min(100, savingsRate * 4) },
+                { label: 'Balance', val: income > 0 ? Math.min(100, Math.round((income / (expense || 1)) * 50)) : 50 },
+                { label: 'Diversif.', val: Math.min(100, categoryData.length * 14) },
+                { label: 'Control', val: subs.length <= 2 ? 90 : subs.length <= 4 ? 65 : 40 },
               ].map(p => (
                 <div key={p.label} className="pillar">
                   <div className="pillar-bar-bg">
-                    <motion.div
-                      className="pillar-bar-fill"
-                      style={{ background: p.val >= 80 ? 'var(--green)' : p.val >= 60 ? 'var(--yellow)' : 'var(--red)' }}
-                      initial={{ height: 0 }}
-                      animate={{ height: `${p.val}%` }}
-                      transition={{ delay: 0.6, duration: 0.7 }}
-                    />
+                    <motion.div className="pillar-bar-fill" style={{ background: p.val >= 70 ? 'var(--green)' : p.val >= 45 ? 'var(--yellow)' : 'var(--red)', height: `${p.val}%` }} initial={{ height: 0 }} animate={{ height: `${p.val}%` }} transition={{ delay: 0.6, duration: 0.7 }} />
                   </div>
                   <span className="pillar-label">{p.label}</span>
                   <span className="pillar-val">{p.val}</span>
@@ -131,47 +189,39 @@ export default function Insights() {
       </div>
 
       <style>{`
-        .page { padding: 32px 36px; max-width: 1100px; }
-        .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; }
-        .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
-        .page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
-        .ai-badge { display: flex; align-items: center; gap: 6px; background: var(--accent-dim); border: 1px solid rgba(108,99,255,0.3); color: var(--accent-light); padding: 7px 13px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-        .insights-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .insights-col { display: flex; flex-direction: column; gap: 12px; }
-        .section-title-row { display: flex; align-items: center; gap: 8px; }
-        .section-title-row h3 { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
-        .insight-card {
-          display: flex; gap: 14px;
-          background: var(--bg-card); border: 1px solid var(--border);
-          border-radius: 12px; padding: 16px;
-          transition: border-color 0.2s;
-        }
-        .insight-card:hover { border-color: var(--border); }
-        .insight-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .insight-body { display: flex; flex-direction: column; gap: 4px; }
-        .insight-body h4 { font-size: 14px; font-weight: 600; }
-        .insight-body p { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
-        .insight-action { background: none; border: none; color: var(--accent-light); font-size: 12px; font-weight: 500; cursor: pointer; padding: 0; margin-top: 4px; text-align: left; }
-        .pie-card, .score-card {
-          background: var(--bg-card); border: 1px solid var(--border);
-          border-radius: 12px; padding: 20px;
-        }
-        .legend { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+        .page { padding: 20px 24px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+        .page-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+        .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        .page-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .ai-badge { display: flex; align-items: center; gap: 6px; background: var(--accent-dim); border: 1px solid rgba(108,99,255,0.3); color: var(--accent-light); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .insights-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }
+        .col-left, .col-right { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 2px; }
+        .section-label { display: flex; align-items: center; gap: 7px; }
+        .section-label span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
+        .insight-card { display: flex; gap: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; padding: 13px; }
+        .insight-icon { width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .insight-body h4 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+        .insight-body p { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+        .mini-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; padding: 14px; }
+        .mini-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+        .pie-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; padding: 14px; }
+        .legend { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
         .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-        .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
         .legend-name { flex: 1; color: var(--text-secondary); }
-        .legend-val { font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
-        .score-display { display: flex; align-items: baseline; gap: 4px; margin-bottom: 10px; }
-        .score-num { font-size: 48px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; color: var(--green); letter-spacing: -2px; }
-        .score-label { font-size: 18px; color: var(--text-dim); }
-        .score-bar-bg { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 16px; }
-        .score-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 3px; }
-        .score-pillars { display: flex; gap: 16px; justify-content: space-around; }
-        .pillar { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .pillar-bar-bg { width: 28px; height: 64px; background: var(--border); border-radius: 4px; display: flex; align-items: flex-end; overflow: hidden; }
-        .pillar-bar-fill { width: 100%; border-radius: 4px; }
-        .pillar-label { font-size: 10px; color: var(--text-dim); }
-        .pillar-val { font-size: 12px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+        .legend-val { font-weight: 600; font-family: 'Space Grotesk', sans-serif; font-size: 11px; }
+        .score-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; padding: 14px; }
+        .score-display { display: flex; align-items: baseline; gap: 4px; margin: 10px 0 8px; }
+        .score-num { font-size: 44px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; letter-spacing: -2px; }
+        .score-label { font-size: 16px; color: var(--text-dim); }
+        .score-bar-bg { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
+        .score-bar-fill { height: 100%; border-radius: 3px; }
+        .pillars { display: flex; gap: 14px; justify-content: space-around; }
+        .pillar { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .pillar-bar-bg { width: 26px; height: 56px; background: var(--border); border-radius: 4px; display: flex; align-items: flex-end; overflow: hidden; }
+        .pillar-bar-fill { width: 100%; border-radius: 4px; transition: none; }
+        .pillar-label { font-size: 9px; color: var(--text-dim); text-align: center; }
+        .pillar-val { font-size: 11px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
       `}</style>
     </div>
   )

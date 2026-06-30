@@ -24,7 +24,7 @@ function Select<T extends string>({ value, options, onChange }: { value: T; opti
 }
 
 export default function Settings() {
-  const { settings, updateSettings, updateNotification } = useApp()
+  const { settings, updateSettings, updateNotification, exportCSV } = useApp()
 
   return (
     <div className="page">
@@ -151,7 +151,7 @@ export default function Settings() {
           </div>
           <div className="settings-rows">
             {[
-              { label: 'Exportar mis datos', desc: 'Descarga tu historial en CSV', action: () => exportCSV() },
+              { label: 'Exportar mis datos', desc: 'Descarga tu historial en CSV', action: exportCSV },
               { label: 'Limpiar historial', desc: 'Elimina transacciones antiguas', action: () => alert('Función en desarrollo') },
               { label: 'Eliminar cuenta', desc: 'Esta acción es irreversible', action: () => alert('Función en desarrollo'), danger: true },
             ].map(item => (
@@ -234,23 +234,3 @@ export default function Settings() {
   )
 }
 
-function exportCSV() {
-  try {
-    const { transactions } = (window as any).__zwam_ctx__ || {}
-    const rows = [['ID','Descripción','Monto','Tipo','Categoría','Fecha','Billetera']]
-    const data = JSON.parse(localStorage.getItem('zwam-txs') || '[]')
-    if (!data.length) {
-      alert('No hay datos para exportar aún. Agrega transacciones primero.')
-      return
-    }
-    data.forEach((t: any) => rows.push([t.id, t.description, t.amount, t.type, t.category, t.date, t.wallet]))
-    const csv = rows.map(r => r.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = 'zwam-transacciones.csv'; a.click()
-    URL.revokeObjectURL(url)
-  } catch {
-    alert('Exportación disponible una vez que agregues transacciones.')
-  }
-}

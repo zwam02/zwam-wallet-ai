@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { TrendingUp, TrendingDown, Wallet, Sparkles, ArrowUpRight, ArrowDownRight, Plus } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import { wallets, monthlyData } from '../data/mock'
@@ -97,7 +98,7 @@ export default function Dashboard() {
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }} className="recent-card">
           <div className="card-header">
             <h3>Movimientos Recientes</h3>
-            <a href="/transactions" className="link-small">Ver todos</a>
+            <Link to="/transactions" className="link-small">Ver todos</Link>
           </div>
           <div className="tx-list">
             {transactions.slice(0, 8).map((tx, i) => (
