@@ -1,6 +1,7 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { Outlet, NavLink, Link } from 'react-router-dom'
 import { LayoutDashboard, ArrowLeftRight, Wallet, Sparkles, Settings } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { useApp } from '../context/AppContext'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -10,7 +11,13 @@ const navItems = [
   { to: '/settings', icon: Settings, label: 'Ajustes' },
 ]
 
+function getInitials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
 export default function Layout() {
+  const { profile } = useApp()
+
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -37,119 +44,68 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          <div className="user-avatar">JD</div>
-          <div className="user-info">
-            <span className="user-name">Juan Díaz</span>
-            <span className="user-plan">Pro Plan</span>
+        <Link to="/settings" className="sidebar-footer">
+          <div className="user-avatar" style={{ background: profile.avatarColor }}>
+            {getInitials(profile.name)}
           </div>
-        </div>
+          <div className="user-info">
+            <span className="user-name">{profile.name}</span>
+            <span className="user-plan">{profile.plan} Plan</span>
+          </div>
+        </Link>
       </aside>
       <main className="main-content">
         <Outlet />
       </main>
 
       <style>{`
-        .layout {
-          display: flex;
-          height: 100vh;
-          overflow: hidden;
-        }
+        .layout { display: flex; height: 100vh; overflow: hidden; }
         .sidebar {
-          width: 220px;
-          flex-shrink: 0;
+          width: 220px; flex-shrink: 0;
           background: var(--bg-secondary);
           border-right: 1px solid var(--border);
-          display: flex;
-          flex-direction: column;
-          padding: 24px 12px;
-          gap: 8px;
+          display: flex; flex-direction: column;
+          padding: 24px 12px; gap: 8px;
         }
-        .sidebar-logo {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 0 8px;
-          margin-bottom: 28px;
-        }
+        .sidebar-logo { display: flex; align-items: center; gap: 10px; padding: 0 8px; margin-bottom: 28px; }
         .logo-icon {
-          width: 32px;
-          height: 32px;
-          background: var(--accent);
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 700;
-          font-size: 16px;
-          color: white;
+          width: 32px; height: 32px; background: var(--accent);
+          border-radius: 8px; display: flex; align-items: center; justify-content: center;
+          font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; color: white;
         }
-        .logo-text {
-          font-family: 'Space Grotesk', sans-serif;
-          font-weight: 700;
-          font-size: 18px;
-          color: var(--text-primary);
-          letter-spacing: -0.3px;
-        }
-        .sidebar-nav {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-          flex: 1;
-        }
+        .logo-text { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; color: var(--text-primary); letter-spacing: -0.3px; }
+        .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
         .nav-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 12px;
-          border-radius: 8px;
-          color: var(--text-secondary);
-          text-decoration: none;
-          font-size: 14px;
-          font-weight: 500;
-          position: relative;
+          display: flex; align-items: center; gap: 10px;
+          padding: 10px 12px; border-radius: 8px;
+          color: var(--text-secondary); text-decoration: none;
+          font-size: 14px; font-weight: 500; position: relative;
           transition: color 0.15s;
         }
         .nav-item:hover { color: var(--text-primary); }
         .nav-item.active { color: var(--text-primary); }
         .nav-active-bg {
-          position: absolute;
-          inset: 0;
-          background: var(--accent-dim);
-          border-radius: 8px;
-          border: 1px solid rgba(108, 99, 255, 0.2);
-          z-index: -1;
+          position: absolute; inset: 0;
+          background: var(--accent-dim); border-radius: 8px;
+          border: 1px solid rgba(108,99,255,0.2); z-index: -1;
         }
         .sidebar-footer {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 10px 8px;
-          border-top: 1px solid var(--border);
-          margin-top: 8px;
+          display: flex; align-items: center; gap: 10px;
+          padding: 10px 8px; border-top: 1px solid var(--border);
+          margin-top: 8px; text-decoration: none;
+          border-radius: 8px; transition: background 0.15s; cursor: pointer;
         }
+        .sidebar-footer:hover { background: var(--bg-card-hover); }
         .user-avatar {
-          width: 32px;
-          height: 32px;
-          background: var(--accent);
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 12px;
-          font-weight: 600;
-          color: white;
-          flex-shrink: 0;
+          width: 32px; height: 32px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
+          transition: background 0.3s;
         }
-        .user-info { display: flex; flex-direction: column; }
-        .user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+        .user-info { display: flex; flex-direction: column; overflow: hidden; }
+        .user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .user-plan { font-size: 11px; color: var(--accent-light); }
-        .main-content {
-          flex: 1;
-          overflow: hidden;
-          background: var(--bg-primary);
-        }
+        .main-content { flex: 1; overflow: hidden; background: var(--bg-primary); }
       `}</style>
     </div>
   )

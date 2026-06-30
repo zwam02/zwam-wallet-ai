@@ -4,6 +4,15 @@ import { transactions as initialTxs, wallets as initialWallets, type Transaction
 type Currency = 'USD' | 'EUR' | 'MXN' | 'ARS' | 'COP'
 type Language = 'Español' | 'English'
 
+export type Profile = {
+  name: string
+  email: string
+  plan: 'Free' | 'Pro' | 'Business'
+  avatarColor: string
+  bio: string
+  phone: string
+}
+
 export type Settings = {
   theme: 'dark' | 'light'
   currency: Currency
@@ -12,16 +21,35 @@ export type Settings = {
   twoFactor: boolean
 }
 
+export type Budget = {
+  category: string
+  limit: number
+}
+
 type AppContextType = {
   transactions: Transaction[]
   wallets: Wallet[]
+  profile: Profile
+  settings: Settings
+  budgets: Budget[]
   addTransaction: (tx: Transaction) => void
   deleteTransaction: (id: string) => void
   addWallet: (w: Wallet) => void
-  settings: Settings
+  updateProfile: (patch: Partial<Profile>) => void
   updateSettings: (patch: Partial<Settings>) => void
   updateNotification: (key: keyof Settings['notifications'], val: boolean) => void
+  setBudget: (category: string, limit: number) => void
+  removeBudget: (category: string) => void
   exportCSV: () => void
+}
+
+const defaultProfile: Profile = {
+  name: 'Juan Díaz',
+  email: 'juan@zwam.ai',
+  plan: 'Pro',
+  avatarColor: '#6c63ff',
+  bio: '',
+  phone: '',
 }
 
 const defaultSettings: Settings = {
@@ -55,45 +83,48 @@ function applyTheme(theme: 'dark' | 'light') {
   }
 }
 
-function loadTxs(): Transaction[] {
+function load<T>(key: string, fallback: T): T {
   try {
-    const s = localStorage.getItem('zwam-txs')
-    return s ? JSON.parse(s) : initialTxs
-  } catch { return initialTxs }
+    const s = localStorage.getItem(key)
+    return s ? { ...fallback as object, ...JSON.parse(s) } as T : fallback
+  } catch { return fallback }
 }
 
-function loadWallets(): Wallet[] {
+function loadArr<T>(key: string, fallback: T[]): T[] {
   try {
-    const s = localStorage.getItem('zwam-wallets')
-    return s ? JSON.parse(s) : initialWallets
-  } catch { return initialWallets }
+    const s = localStorage.getItem(key)
+    return s ? JSON.parse(s) : fallback
+  } catch { return fallback }
 }
 
 const AppContext = createContext<AppContextType | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [transactions, setTransactions] = useState<Transaction[]>(loadTxs)
-  const [wallets, setWallets] = useState<Wallet[]>(loadWallets)
-  const [settings, setSettings] = useState<Settings>(() => {
-    try {
-      const s = localStorage.getItem('zwam-settings')
-      return s ? { ...defaultSettings, ...JSON.parse(s) } : defaultSettings
-    } catch { return defaultSettings }
-  })
+  const [transactions, setTransactions] = useState<Transaction[]>(() => loadArr('zwam-txs', initialTxs))
+  const [wallets, setWallets] = useState<Wallet[]>(() => loadArr('zwam-wallets', initialWallets))
+  const [profile, setProfile] = useState<Profile>(() => load('zwam-profile', defaultProfile))
+  const [settings, setSettings] = useState<Settings>(() => load('zwam-settings', defaultSettings))
+  const [budgets, setBudgets] = useState<Budget[]>(() => loadArr('zwam-budgets', [
+    { category: 'Alimentación', limit: 400 },
+    { category: 'Vivienda', limit: 1200 },
+    { category: 'Entretenimiento', limit: 100 },
+    { category: 'Transporte', limit: 150 },
+    { category: 'Salud', limit: 200 },
+  ]))
 
   useEffect(() => { localStorage.setItem('zwam-txs', JSON.stringify(transactions)) }, [transactions])
   useEffect(() => { localStorage.setItem('zwam-wallets', JSON.stringify(wallets)) }, [wallets])
+  useEffect(() => { localStorage.setItem('zwam-profile', JSON.stringify(profile)) }, [profile])
+  useEffect(() => { localStorage.setItem('zwam-budgets', JSON.stringify(budgets)) }, [budgets])
   useEffect(() => {
     localStorage.setItem('zwam-settings', JSON.stringify(settings))
     applyTheme(settings.theme)
   }, [settings])
 
-  // apply theme on mount
   useEffect(() => { applyTheme(settings.theme) }, [])
 
   const addTransaction = (tx: Transaction) => {
     setTransactions(prev => [tx, ...prev])
-    // update wallet balance
     setWallets(prev => prev.map(w =>
       w.id === tx.wallet
         ? { ...w, balance: w.balance + (tx.type === 'income' ? tx.amount : -tx.amount) }
@@ -113,12 +144,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const addWallet = (w: Wallet) => setWallets(prev => [...prev, w])
-
-  const updateSettings = (patch: Partial<Settings>) =>
-    setSettings(prev => ({ ...prev, ...patch }))
-
+  const updateProfile = (patch: Partial<Profile>) => setProfile(prev => ({ ...prev, ...patch }))
+  const updateSettings = (patch: Partial<Settings>) => setSettings(prev => ({ ...prev, ...patch }))
   const updateNotification = (key: keyof Settings['notifications'], val: boolean) =>
     setSettings(prev => ({ ...prev, notifications: { ...prev.notifications, [key]: val } }))
+
+  const setBudget = (category: string, limit: number) =>
+    setBudgets(prev => {
+      const exists = prev.find(b => b.category === category)
+      if (exists) return prev.map(b => b.category === category ? { ...b, limit } : b)
+      return [...prev, { category, limit }]
+    })
+
+  const removeBudget = (category: string) =>
+    setBudgets(prev => prev.filter(b => b.category !== category))
 
   const exportCSV = () => {
     const rows = [['ID', 'Descripción', 'Monto', 'Tipo', 'Categoría', 'Fecha', 'Billetera']]
@@ -132,7 +171,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AppContext.Provider value={{ transactions, wallets, addTransaction, deleteTransaction, addWallet, settings, updateSettings, updateNotification, exportCSV }}>
+    <AppContext.Provider value={{
+      transactions, wallets, profile, settings, budgets,
+      addTransaction, deleteTransaction, addWallet,
+      updateProfile, updateSettings, updateNotification,
+      setBudget, removeBudget, exportCSV,
+    }}>
       {children}
     </AppContext.Provider>
   )

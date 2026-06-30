@@ -1,17 +1,16 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Sparkles, TrendingUp, AlertTriangle, CheckCircle, Info, PieChart } from 'lucide-react'
+import { Sparkles, TrendingUp, AlertTriangle, CheckCircle, Info, PieChart, Target } from 'lucide-react'
 import { PieChart as RechartsPie, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { useApp } from '../context/AppContext'
+import { Link } from 'react-router-dom'
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2 })
-
 const PALETTE = ['#6c63ff', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#f97316', '#8b5cf6', '#14b8a6']
 
 export default function Insights() {
-  const { transactions } = useApp()
+  const { transactions, budgets } = useApp()
 
-  // Category breakdown from real data
   const categoryData = useMemo(() => {
     const map = new Map<string, number>()
     transactions.filter(t => t.type === 'expense').forEach(t => {
@@ -22,7 +21,6 @@ export default function Insights() {
       .sort((a, b) => b.value - a.value)
   }, [transactions])
 
-  // Monthly bar data from real transactions
   const monthlyData = useMemo(() => {
     const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
     const map = new Map<string, { ingresos: number; gastos: number }>()
@@ -37,19 +35,34 @@ export default function Insights() {
     return months.filter(m => map.has(m)).map(m => ({ month: m, ...map.get(m)! }))
   }, [transactions])
 
-  // Savings rate
   const income = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const expense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
   const savingsRate = income > 0 ? Math.round(((income - expense) / income) * 100) : 0
 
-  // Subscriptions (recurring charges)
-  const subs = useMemo(() => transactions.filter(t =>
-    t.type === 'expense' && ['Netflix', 'Spotify', 'Gym', 'Amazon', 'Apple'].some(k => t.description.includes(k))
-  ), [transactions])
+  const subs = useMemo(() =>
+    transactions.filter(t => t.type === 'expense' && ['Netflix', 'Spotify', 'Gym', 'Amazon', 'Apple'].some(k => t.description.includes(k)))
+  , [transactions])
 
-  // AI Insights dynamically generated
+  // Budget progress
+  const spent: Record<string, number> = {}
+  transactions.filter(t => t.type === 'expense').forEach(t => {
+    spent[t.category] = (spent[t.category] ?? 0) + t.amount
+  })
+  const overBudget = budgets.filter(b => (spent[b.category] ?? 0) > b.limit)
+  const nearBudget = budgets.filter(b => { const pct = (spent[b.category] ?? 0) / b.limit; return pct >= 0.75 && pct <= 1 })
+
   const insights = useMemo(() => {
     const list = []
+
+    if (overBudget.length > 0) {
+      const cats = overBudget.map(b => b.category).join(', ')
+      list.push({ id: 'overbudget', type: 'warning', title: `Presupuesto superado en ${overBudget.length} categoría${overBudget.length > 1 ? 's' : ''}`, description: `Has excedido el límite en: ${cats}. Revisa tus gastos esta semana.`, action: 'Ver presupuestos' })
+    }
+
+    if (nearBudget.length > 0 && overBudget.length === 0) {
+      list.push({ id: 'near', type: 'warning', title: `Cerca del límite en ${nearBudget.map(b => b.category).join(', ')}`, description: `Ya superaste el 75% de tu presupuesto. Modera los gastos para no sobrepasarlo.`, action: 'Ver presupuestos' })
+    }
+
     if (savingsRate >= 20) {
       list.push({ id: 'savings', type: 'success', title: 'Buen ritmo de ahorro', description: `Estás ahorrando el ${savingsRate}% de tus ingresos. ${savingsRate >= 30 ? '¡Excelente, superas la meta recomendada del 20%!' : 'Estás en buen camino.'}`, action: 'Ver billeteras' })
     } else if (income > 0) {
@@ -68,15 +81,15 @@ export default function Insights() {
     }
 
     if (income - expense > 1000) {
-      list.push({ id: 'invest', type: 'info', title: 'Oportunidad de inversión', description: `Tienes $${fmt(income - expense)} disponibles. Con un perfil moderado podrías generar 7-9% anual invirtiéndolos.`, action: 'Ver billeteras' })
+      list.push({ id: 'invest', type: 'info', title: 'Oportunidad de inversión', description: `Tienes $${fmt(income - expense)} disponibles. Con un perfil moderado podrías generar 7-9% anual.`, action: 'Ver billeteras' })
     }
 
     if (list.length === 0) {
-      list.push({ id: 'empty', type: 'info', title: 'Agrega transacciones', description: 'Una vez que agregues más movimientos, el sistema generará recomendaciones personalizadas automáticamente.', action: 'Agregar transacción' })
+      list.push({ id: 'empty', type: 'info', title: 'Agrega transacciones', description: 'Una vez que agregues más movimientos, el sistema generará recomendaciones personalizadas.', action: '' })
     }
 
     return list
-  }, [transactions, categoryData, savingsRate, subs])
+  }, [transactions, categoryData, savingsRate, subs, overBudget, nearBudget])
 
   const iconMap = {
     warning: { icon: AlertTriangle, color: 'var(--yellow)', bg: 'rgba(245,158,11,0.12)' },
@@ -84,12 +97,11 @@ export default function Insights() {
     info: { icon: Info, color: 'var(--accent-light)', bg: 'var(--accent-dim)' },
   }
 
-  // Health score
   const score = Math.min(100, Math.max(0,
     (savingsRate >= 20 ? 30 : Math.round(savingsRate * 1.5)) +
     (expense < income ? 30 : 10) +
     (subs.length <= 3 ? 20 : 10) +
-    (categoryData.length >= 3 ? 20 : 10)
+    (overBudget.length === 0 ? 20 : Math.max(0, 20 - overBudget.length * 5))
   ))
 
   return (
@@ -103,12 +115,13 @@ export default function Insights() {
       </div>
 
       <div className="insights-layout">
+        {/* LEFT */}
         <div className="col-left">
           <div className="section-label"><Sparkles size={13} color="var(--accent-light)" /><span>Recomendaciones</span></div>
           {insights.map((ins, i) => {
             const { icon: Icon, color, bg } = iconMap[ins.type as keyof typeof iconMap]
             return (
-              <motion.div key={ins.id} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }} className="insight-card">
+              <motion.div key={ins.id} initial={{ opacity: 0, x: -14 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.07 }} className="insight-card">
                 <div className="insight-icon" style={{ background: bg, color }}><Icon size={15} /></div>
                 <div className="insight-body">
                   <h4>{ins.title}</h4>
@@ -118,8 +131,39 @@ export default function Insights() {
             )
           })}
 
+          {/* Budget progress */}
+          {budgets.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="mini-card">
+              <div className="mini-header">
+                <Target size={13} />
+                <span>Presupuestos del mes</span>
+                <Link to="/settings" className="mini-link">Gestionar</Link>
+              </div>
+              <div className="budget-bars">
+                {budgets.map(b => {
+                  const s = spent[b.category] ?? 0
+                  const pct = Math.min(100, Math.round((s / b.limit) * 100))
+                  const over = s > b.limit
+                  const warn = pct >= 75 && !over
+                  const color = over ? 'var(--red)' : warn ? 'var(--yellow)' : 'var(--green)'
+                  return (
+                    <div key={b.category} className="bbar-row">
+                      <div className="bbar-labels">
+                        <span>{b.category}</span>
+                        <span style={{ color, fontFamily: "'Space Grotesk', sans-serif", fontSize: 11 }}>${fmt(s)} / ${fmt(b.limit)}</span>
+                      </div>
+                      <div className="bbar-track">
+                        <motion.div className="bbar-fill" style={{ background: color }} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )}
+
           {monthlyData.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mini-card">
+            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} className="mini-card">
               <div className="mini-header"><TrendingUp size={13} /><span>Ingresos vs Gastos por mes</span></div>
               <ResponsiveContainer width="100%" height={140}>
                 <BarChart data={monthlyData} barSize={10}>
@@ -135,6 +179,7 @@ export default function Insights() {
           )}
         </div>
 
+        {/* RIGHT */}
         <div className="col-right">
           {categoryData.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="pie-card">
@@ -172,7 +217,7 @@ export default function Insights() {
               {[
                 { label: 'Ahorro', val: Math.min(100, savingsRate * 4) },
                 { label: 'Balance', val: income > 0 ? Math.min(100, Math.round((income / (expense || 1)) * 50)) : 50 },
-                { label: 'Diversif.', val: Math.min(100, categoryData.length * 14) },
+                { label: 'Presup.', val: budgets.length === 0 ? 70 : Math.max(0, 100 - overBudget.length * 25) },
                 { label: 'Control', val: subs.length <= 2 ? 90 : subs.length <= 4 ? 65 : 40 },
               ].map(p => (
                 <div key={p.label} className="pillar">
@@ -203,7 +248,13 @@ export default function Insights() {
         .insight-body h4 { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
         .insight-body p { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
         .mini-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; padding: 14px; }
-        .mini-header { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+        .mini-header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+        .mini-link { margin-left: auto; font-size: 11px; color: var(--accent-light); text-decoration: none; font-weight: 600; }
+        .budget-bars { display: flex; flex-direction: column; gap: 10px; }
+        .bbar-row { display: flex; flex-direction: column; gap: 4px; }
+        .bbar-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+        .bbar-track { height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+        .bbar-fill { height: 100%; border-radius: 3px; }
         .pie-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; padding: 14px; }
         .legend { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
         .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
@@ -219,9 +270,10 @@ export default function Insights() {
         .pillars { display: flex; gap: 14px; justify-content: space-around; }
         .pillar { display: flex; flex-direction: column; align-items: center; gap: 5px; }
         .pillar-bar-bg { width: 26px; height: 56px; background: var(--border); border-radius: 4px; display: flex; align-items: flex-end; overflow: hidden; }
-        .pillar-bar-fill { width: 100%; border-radius: 4px; transition: none; }
+        .pillar-bar-fill { width: 100%; border-radius: 4px; }
         .pillar-label { font-size: 9px; color: var(--text-dim); text-align: center; }
         .pillar-val { font-size: 11px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
+        :root { --yellow: #f59e0b; }
       `}</style>
     </div>
   )
