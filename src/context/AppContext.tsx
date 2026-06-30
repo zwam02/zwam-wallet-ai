@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import { transactions as initialTxs, wallets as initialWallets, type Transaction, type Wallet } from '../data/mock'
+import type { ConnectedWallet } from '../components/ConnectWalletModal'
 
 type Currency = 'USD' | 'EUR' | 'MXN' | 'ARS' | 'COP'
 type Language = 'Español' | 'English'
@@ -29,12 +30,15 @@ export type Budget = {
 type AppContextType = {
   transactions: Transaction[]
   wallets: Wallet[]
+  connectedWallets: ConnectedWallet[]
   profile: Profile
   settings: Settings
   budgets: Budget[]
   addTransaction: (tx: Transaction) => void
   deleteTransaction: (id: string) => void
   addWallet: (w: Wallet) => void
+  connectWeb3Wallet: (w: ConnectedWallet) => void
+  disconnectWeb3Wallet: (id: string) => void
   updateProfile: (patch: Partial<Profile>) => void
   updateSettings: (patch: Partial<Settings>) => void
   updateNotification: (key: keyof Settings['notifications'], val: boolean) => void
@@ -102,6 +106,7 @@ const AppContext = createContext<AppContextType | null>(null)
 export function AppProvider({ children }: { children: ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>(() => loadArr('zwam-txs', initialTxs))
   const [wallets, setWallets] = useState<Wallet[]>(() => loadArr('zwam-wallets', initialWallets))
+  const [connectedWallets, setConnectedWallets] = useState<ConnectedWallet[]>(() => loadArr('zwam-web3', []))
   const [profile, setProfile] = useState<Profile>(() => load('zwam-profile', defaultProfile))
   const [settings, setSettings] = useState<Settings>(() => load('zwam-settings', defaultSettings))
   const [budgets, setBudgets] = useState<Budget[]>(() => loadArr('zwam-budgets', [
@@ -114,6 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { localStorage.setItem('zwam-txs', JSON.stringify(transactions)) }, [transactions])
   useEffect(() => { localStorage.setItem('zwam-wallets', JSON.stringify(wallets)) }, [wallets])
+  useEffect(() => { localStorage.setItem('zwam-web3', JSON.stringify(connectedWallets)) }, [connectedWallets])
   useEffect(() => { localStorage.setItem('zwam-profile', JSON.stringify(profile)) }, [profile])
   useEffect(() => { localStorage.setItem('zwam-budgets', JSON.stringify(budgets)) }, [budgets])
   useEffect(() => {
@@ -144,6 +150,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const addWallet = (w: Wallet) => setWallets(prev => [...prev, w])
+  const connectWeb3Wallet = (w: ConnectedWallet) => setConnectedWallets(prev => [...prev, w])
+  const disconnectWeb3Wallet = (id: string) => setConnectedWallets(prev => prev.filter(w => w.id !== id))
   const updateProfile = (patch: Partial<Profile>) => setProfile(prev => ({ ...prev, ...patch }))
   const updateSettings = (patch: Partial<Settings>) => setSettings(prev => ({ ...prev, ...patch }))
   const updateNotification = (key: keyof Settings['notifications'], val: boolean) =>
@@ -172,8 +180,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      transactions, wallets, profile, settings, budgets,
-      addTransaction, deleteTransaction, addWallet,
+      transactions, wallets, connectedWallets, profile, settings, budgets,
+      addTransaction, deleteTransaction, addWallet, connectWeb3Wallet, disconnectWeb3Wallet,
       updateProfile, updateSettings, updateNotification,
       setBudget, removeBudget, exportCSV,
     }}>
