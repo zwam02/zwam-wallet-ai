@@ -6,6 +6,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { monthlyData } from '../data/mock'
 import { useApp } from '../context/AppContext'
 import NewTransactionModal, { modalStyles } from '../components/NewTransactionModal'
+import AIAnalysisPanel, { aiPanelStyles } from '../components/AIAnalysisPanel'
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2 })
 
@@ -22,6 +23,7 @@ const cardVariants = {
 export default function Dashboard() {
   const { transactions, wallets, addTransaction } = useApp()
   const [modalOpen, setModalOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
 
   const totalBalance = wallets.reduce((s, w) => s + w.balance, 0)
   const thisMonthIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
@@ -38,7 +40,7 @@ export default function Dashboard() {
           <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn-primary" onClick={() => setModalOpen(true)}>
             <Plus size={14} /> Nueva transacción
           </motion.button>
-          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn-secondary">
+          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn-secondary" onClick={() => setAiOpen(true)}>
             <Sparkles size={14} /> Analizar con IA
           </motion.button>
         </div>
@@ -127,6 +129,8 @@ export default function Dashboard() {
         onAdd={tx => { addTransaction(tx); setModalOpen(false) }}
       />
 
+      <AIAnalysisPanel open={aiOpen} onClose={() => setAiOpen(false)} />
+
       <style>{`
         .page {
           height: 100vh;
@@ -188,6 +192,7 @@ export default function Dashboard() {
         .tx-cat { font-size: 10px; color: var(--text-dim); }
         .tx-amount { font-size: 12px; font-weight: 600; font-family: 'Space Grotesk', sans-serif; flex-shrink: 0; }
         ${modalStyles}
+        ${aiPanelStyles}
       `}</style>
     </div>
   )

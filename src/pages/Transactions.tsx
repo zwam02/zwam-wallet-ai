@@ -6,10 +6,9 @@ import NewTransactionModal, { modalStyles } from '../components/NewTransactionMo
 
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2 })
 
-const walletName: Record<string, string> = { w1: 'Principal', w2: 'Ahorros', w3: 'Cripto', w4: 'Inversiones' }
-
 export default function Transactions() {
-  const { transactions, deleteTransaction, addTransaction } = useApp()
+  const { transactions, wallets, deleteTransaction, addTransaction } = useApp()
+  const walletName = Object.fromEntries(wallets.map(w => [w.id, w.name]))
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [category, setCategory] = useState('Todas')
