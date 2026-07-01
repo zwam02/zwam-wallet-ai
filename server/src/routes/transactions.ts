@@ -13,8 +13,8 @@ router.get('/', async (req: AuthRequest, res) => {
 
 router.post('/', async (req: AuthRequest, res) => {
   const userId = req.userId!;
-  const { walletId, amount, description, type } = req.body;
-  const tx = await prisma.transaction.create({ data: { walletId: Number(walletId), amount: Number(amount), description, type } });
+  const { walletId, balance, description, type } = req.body;
+  const tx = await prisma.transaction.create({ data: { walletId: Number(walletId), balance: Number(balance), description, type } });
   res.json(tx);
 });
 
