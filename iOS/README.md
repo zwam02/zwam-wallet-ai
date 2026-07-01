@@ -1,11 +1,5 @@
-#zwam-wallet-ai
-│
-├── 🔐 Login
-├── 🏠 Dashboard
-├── 💳 Tarjetas
-├── 💸 Movimientos
-├── 📊 Estadísticas
-├── 🤖 IA
-├── ⚙️ Configuración
-├── 🔔 Recordatorios
-└── ☁️ Base de datos
+zwam-wallet-ai/
+├── client/
+├── server/
+├── package.json
+└── README.md
