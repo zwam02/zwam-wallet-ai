@@ -25,4 +25,16 @@ model Wallet {
   balance   Float   @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          Int     @id @default(autoincrement())
+  walletId    Int
+  wallet      Wallet  @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  balance     Float
+  description String?
+  type        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
