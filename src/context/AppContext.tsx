@@ -46,6 +46,7 @@ type AppContextType = {
   setBudget: (category: string, limit: number) => void
   removeBudget: (category: string) => void
   exportCSV: () => void
+  logout: () => void
 }
 
 const defaultProfile: Profile = {
@@ -184,12 +185,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url)
   }
 
+  const logout = () => {
+    localStorage.removeItem('zwam-auth-email')
+    setProfile(defaultProfile)
+  }
+
   return (
     <AppContext.Provider value={{
       transactions, wallets, connectedWallets, profile, settings, budgets,
       addTransaction, deleteTransaction, clearTransactions, addWallet, connectWeb3Wallet, disconnectWeb3Wallet,
       updateProfile, updateSettings, updateNotification,
-      setBudget, removeBudget, exportCSV,
+      setBudget, removeBudget, exportCSV, logout,
     }}>
       {children}
     </AppContext.Provider>
