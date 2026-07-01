@@ -1,4 +1,4 @@
-
+#zwam.wallet.ai
 
 Aplicación iOS nativa construida con SwiftUI que replica completamente la funcionalidad de la versión web.
 
