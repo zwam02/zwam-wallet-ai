@@ -2,4 +2,4 @@
     ├── client/
     ├── server/
     ├── package.json
-    └── README.md
+└── README.md
