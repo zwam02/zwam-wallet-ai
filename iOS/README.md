@@ -1,4 +1,4 @@
-# Zwam Wallet AI - iOS App
+
 
 Aplicación iOS nativa construida con SwiftUI que replica completamente la funcionalidad de la versión web.
 
