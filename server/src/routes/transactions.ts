@@ -13,9 +13,26 @@ router.get('/', async (req: AuthRequest, res) => {
 
 router.post('/', async (req: AuthRequest, res) => {
   const userId = req.userId!;
-  const { walletId, amount, description, type } = req.body;
-  const tx = await prisma.transaction.create({ data: { walletId: Number(walletId), amount: Number(amount), description, type } });
-  res.json(tx);
+  const { walletId, balance, description, type } = req.body;
+
+  if (!walletId || balance === undefined || !type) {
+    return res.status(400).json({ error: 'walletId, balance and type are required' });
+  }
+
+  try {
+    const tx = await prisma.transaction.create({
+      data: {
+        description: description ?? null,
+        type,
+        balance: Number(balance),
+        wallet: { connect: { id: Number(walletId) } },
+      },
+    });
+    res.status(201).json(tx);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create transaction' });
+  }
 });
 
 router.get('/:id', async (req: AuthRequest, res) => {

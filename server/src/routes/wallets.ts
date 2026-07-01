@@ -14,9 +14,26 @@ router.get('/', async (req: AuthRequest, res) => {
 
 router.post('/', async (req: AuthRequest, res) => {
   const userId = req.userId!;
-  const { name, currency } = req.body;
-  const wallet = await prisma.wallet.create({ data: { name, currency, userId } });
-  res.json(wallet);
+  // El esquema define `address` y `balance` en lugar de `name`/`currency`.
+  const { address, balance } = req.body;
+
+  if (!address) {
+    return res.status(400).json({ error: 'address is required' });
+  }
+
+  try {
+    const wallet = await prisma.wallet.create({
+      data: {
+        address,
+        userId,
+        balance: Number(balance ?? 0),
+      },
+    });
+    res.status(201).json(wallet);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create wallet' });
+  }
 });
 
 router.get('/:id', async (req: AuthRequest, res) => {
@@ -39,7 +56,8 @@ router.delete('/:id', async (req: AuthRequest, res) => {
 router.get('/:id/balance', async (req: AuthRequest, res) => {
   const walletId = Number(req.params.id);
   const txs = await prisma.transaction.findMany({ where: { walletId } });
-  const balance = txs.reduce((acc, t) => acc + Number(t.amount), 0);
+  // usar la propiedad balance del modelo Transaction (schema)
+  const balance = txs.reduce((acc, t) => acc + Number(t.balance), 0);
   res.json({ balance });
 });
 
