@@ -1,30 +1,54 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
-import authRoutes from './routes/auth.js';
-import walletRoutes from './routes/wallets.js';
-import transactionRoutes from './routes/transactions.js';
-
-dotenv.config();
+const express = require("express");
+const cors = require("cors");
 
 const app = express();
-const prisma = new PrismaClient();
 
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/auth', authRoutes);
-app.use('/api/wallets', walletRoutes);
-app.use('/api/transactions', transactionRoutes);
+// 🧠 base de datos en memoria (después será real)
+let transactions = [];
 
-const PORT = process.env.PORT ?? 4000;
-app.listen(PORT, async () => {
-  console.log(`Server listening on port ${PORT}`);
-  try {
-    await prisma.$connect();
-    console.log('Connected to database');
-  } catch (err) {
-    console.error('Database connection error', err);
-  }
+// 💸 agregar movimiento
+app.post("/transaction", (req, res) => {
+  const { type, amount, category, description } = req.body;
+
+  const newTx = {
+    id: Date.now(),
+    type, // expense | income
+    amount: Number(amount),
+    category,
+    description,
+    date: new Date()
+  };
+
+  transactions.push(newTx);
+
+  res.json({ ok: true, transaction: newTx });
+});
+
+// 📊 obtener movimientos
+app.get("/transactions", (req, res) => {
+  res.json(transactions);
+});
+
+// 💰 resumen general
+app.get("/summary", (req, res) => {
+  const income = transactions
+    .filter(t => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const expense = transactions
+    .filter(t => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  res.json({
+    income,
+    expense,
+    balance: income - expense
+  });
+});
+
+app.listen(3001, () => {
+  console.log("🚀 API corriendo en http://localhost:3001");
 });
