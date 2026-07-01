@@ -1,4 +1,4 @@
-#zwam.wallet.ai
+#zwam=wallet=ai
 │
 ├── 🔐 Login
 ├── 🏠 Dashboard
