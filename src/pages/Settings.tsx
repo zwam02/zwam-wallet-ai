@@ -26,11 +26,13 @@ function getInitials(name: string) {
 }
 
 export default function Settings() {
-  const { profile, updateProfile, settings, updateSettings, updateNotification, budgets, setBudget, removeBudget, exportCSV, transactions } = useApp()
+  const { profile, updateProfile, settings, updateSettings, updateNotification, budgets, setBudget, removeBudget, exportCSV, transactions, clearTransactions } = useApp()
 
   const [editingProfile, setEditingProfile] = useState(false)
   const [draft, setDraft] = useState(profile)
   const [saved, setSaved] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [newBudgetCat, setNewBudgetCat] = useState('')
   const [newBudgetLimit, setNewBudgetLimit] = useState('')
   const [editingBudget, setEditingBudget] = useState<string | null>(null)
@@ -251,21 +253,41 @@ export default function Settings() {
             <h3>Datos y privacidad</h3>
           </div>
           <div className="settings-rows">
-            {[
-              { label: 'Exportar mis datos', desc: 'Descarga tu historial en CSV', action: exportCSV },
-              { label: 'Limpiar historial', desc: 'Elimina transacciones antiguas', action: () => alert('Función en desarrollo') },
-              { label: 'Eliminar cuenta', desc: 'Esta acción es irreversible', action: () => alert('Función en desarrollo'), danger: true },
-            ].map(item => (
-              <div key={item.label} className="settings-row">
-                <div>
-                  <span className="row-label" style={item.danger ? { color: 'var(--red)' } : {}}>{item.label}</span>
-                  <span className="row-desc">{item.desc}</span>
-                </div>
-                <button onClick={item.action} className={`action-btn ${item.danger ? 'danger' : ''}`}>
-                  {item.label === 'Exportar mis datos' ? 'Exportar' : item.label === 'Limpiar historial' ? 'Limpiar' : 'Eliminar'}
-                </button>
+            <div className="settings-row">
+              <div>
+                <span className="row-label">Exportar mis datos</span>
+                <span className="row-desc">Descarga tu historial en CSV</span>
               </div>
-            ))}
+              <button onClick={exportCSV} className="action-btn">Exportar</button>
+            </div>
+            <div className="settings-row">
+              <div>
+                <span className="row-label">Limpiar historial</span>
+                <span className="row-desc">{transactions.length} transacciones — esto no se puede deshacer</span>
+              </div>
+              {confirmClear ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => { clearTransactions(); setConfirmClear(false) }} className="action-btn danger">Confirmar</button>
+                  <button onClick={() => setConfirmClear(false)} className="action-btn">Cancelar</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmClear(true)} className="action-btn">Limpiar</button>
+              )}
+            </div>
+            <div className="settings-row">
+              <div>
+                <span className="row-label" style={{ color: 'var(--red)' }}>Eliminar cuenta</span>
+                <span className="row-desc">Borra todos tus datos locales permanentemente</span>
+              </div>
+              {confirmDelete ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => { clearTransactions(); localStorage.clear(); window.location.reload() }} className="action-btn danger">Confirmar</button>
+                  <button onClick={() => setConfirmDelete(false)} className="action-btn">Cancelar</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmDelete(true)} className="action-btn danger">Eliminar</button>
+              )}
+            </div>
           </div>
         </motion.div>
 

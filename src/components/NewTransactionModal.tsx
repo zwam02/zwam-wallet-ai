@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Check } from 'lucide-react'
 import type { Transaction } from '../data/mock'
-import { wallets } from '../data/mock'
+import { useApp } from '../context/AppContext'
 
 const categories = ['Trabajo', 'Vivienda', 'Alimentación', 'Transporte', 'Salud', 'Entretenimiento', 'Shopping', 'Cripto', 'Inversiones', 'Otro']
 
@@ -13,11 +13,12 @@ type Props = {
 }
 
 export default function NewTransactionModal({ open, onClose, onAdd }: Props) {
+  const { wallets } = useApp()
   const [type, setType] = useState<'income' | 'expense'>('expense')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('Alimentación')
-  const [wallet, setWallet] = useState('w1')
+  const [wallet, setWallet] = useState(() => wallets[0]?.id ?? 'w1')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')

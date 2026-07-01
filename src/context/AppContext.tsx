@@ -36,6 +36,7 @@ type AppContextType = {
   budgets: Budget[]
   addTransaction: (tx: Transaction) => void
   deleteTransaction: (id: string) => void
+  clearTransactions: () => void
   addWallet: (w: Wallet) => void
   connectWeb3Wallet: (w: ConnectedWallet) => void
   disconnectWeb3Wallet: (id: string) => void
@@ -149,6 +150,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     ))
   }
 
+  const clearTransactions = () => {
+    setTransactions([])
+    setWallets(prev => prev.map(w => ({ ...w, balance: 0 })))
+  }
+
   const addWallet = (w: Wallet) => setWallets(prev => [...prev, w])
   const connectWeb3Wallet = (w: ConnectedWallet) => setConnectedWallets(prev => [...prev, w])
   const disconnectWeb3Wallet = (id: string) => setConnectedWallets(prev => prev.filter(w => w.id !== id))
@@ -181,7 +187,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={{
       transactions, wallets, connectedWallets, profile, settings, budgets,
-      addTransaction, deleteTransaction, addWallet, connectWeb3Wallet, disconnectWeb3Wallet,
+      addTransaction, deleteTransaction, clearTransactions, addWallet, connectWeb3Wallet, disconnectWeb3Wallet,
       updateProfile, updateSettings, updateNotification,
       setBudget, removeBudget, exportCSV,
     }}>

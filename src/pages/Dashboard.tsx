@@ -3,13 +3,16 @@ import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { TrendingUp, TrendingDown, Wallet, Sparkles, ArrowUpRight, ArrowDownRight, Plus } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
-import { wallets, monthlyData } from '../data/mock'
+import { monthlyData } from '../data/mock'
 import { useApp } from '../context/AppContext'
 import NewTransactionModal, { modalStyles } from '../components/NewTransactionModal'
 
-const totalBalance = wallets.reduce((s, w) => s + w.balance, 0)
-
 const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2 })
+
+function getTodayLabel() {
+  return new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    .replace(/^\w/, c => c.toUpperCase())
+}
 
 const cardVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -17,9 +20,10 @@ const cardVariants = {
 }
 
 export default function Dashboard() {
-  const { transactions, addTransaction } = useApp()
+  const { transactions, wallets, addTransaction } = useApp()
   const [modalOpen, setModalOpen] = useState(false)
 
+  const totalBalance = wallets.reduce((s, w) => s + w.balance, 0)
   const thisMonthIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
   const thisMonthExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
 
@@ -28,7 +32,7 @@ export default function Dashboard() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">Martes, 30 de junio de 2026</p>
+          <p className="page-subtitle">{getTodayLabel()}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} className="btn-primary" onClick={() => setModalOpen(true)}>

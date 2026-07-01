@@ -54,7 +54,7 @@ export function useCryptoPrices() {
       const ts = Date.now()
       localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts }))
       setState({ prices: data, loading: false, error: null, lastUpdated: new Date(ts) })
-    } catch (e: any) {
+    } catch {
       // Fallback to cache even if expired
       const cache = loadCache()
       if (cache) {
