@@ -6,6 +6,8 @@ export type Transaction = {
   category: string
   date: string
   wallet: string
+  notes?: string
+  recurring?: boolean
 }
 
 export type Wallet = {

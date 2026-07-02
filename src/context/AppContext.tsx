@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import { type Transaction, type Wallet } from '../data/mock'
 import type { ConnectedWallet } from '../components/ConnectWalletModal'
 import type { PaymentMethod } from '../components/AddCardModal'
@@ -11,6 +11,7 @@ export type Profile = {
   email: string
   plan: 'Free' | 'Pro' | 'Business'
   avatarColor: string
+  avatarEmoji: string
   bio: string
   phone: string
 }
@@ -28,6 +29,15 @@ export type Budget = {
   limit: number
 }
 
+export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  USD: '$', EUR: '€', MXN: '$', ARS: '$', COP: '$',
+}
+
+export function fmtCurrency(amount: number, currency: Currency = 'USD'): string {
+  const symbol = CURRENCY_SYMBOLS[currency]
+  return `${symbol}${amount.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 type AppContextType = {
   transactions: Transaction[]
   wallets: Wallet[]
@@ -37,9 +47,12 @@ type AppContextType = {
   settings: Settings
   budgets: Budget[]
   addTransaction: (tx: Transaction) => void
+  updateTransaction: (id: string, patch: Partial<Transaction>) => void
   deleteTransaction: (id: string) => void
   clearTransactions: () => void
   addWallet: (w: Wallet) => void
+  updateWallet: (id: string, patch: Partial<Wallet>) => void
+  deleteWallet: (id: string) => void
   connectWeb3Wallet: (w: ConnectedWallet) => void
   disconnectWeb3Wallet: (id: string) => void
   addPaymentMethod: (m: PaymentMethod) => void
@@ -61,6 +74,7 @@ const defaultProfile: Profile = {
   email: '',
   plan: 'Free',
   avatarColor: '#6c63ff',
+  avatarEmoji: '',
   bio: '',
   phone: '',
 }
@@ -118,7 +132,6 @@ function loadArr<T>(key: string, fallback: T[]): T[] {
 const AppContext = createContext<AppContextType | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  // Clear old data if version changed
   if (localStorage.getItem('zwam-version') !== DATA_VERSION) {
     clearOldData()
     localStorage.setItem('zwam-version', DATA_VERSION)
@@ -145,16 +158,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { applyTheme(settings.theme) }, [])
 
-  const addTransaction = (tx: Transaction) => {
+  const addTransaction = useCallback((tx: Transaction) => {
     setTransactions(prev => [tx, ...prev])
     setWallets(prev => prev.map(w =>
       w.id === tx.wallet
         ? { ...w, balance: w.balance + (tx.type === 'income' ? tx.amount : -tx.amount) }
         : w
     ))
-  }
+  }, [])
 
-  const deleteTransaction = (id: string) => {
+  const updateTransaction = useCallback((id: string, patch: Partial<Transaction>) => {
+    setTransactions(prev => prev.map(t => {
+      if (t.id !== id) return t
+      const oldTx = t
+      const newTx = { ...t, ...patch }
+      // Reverse old effect and apply new
+      setWallets(ws => ws.map(w => {
+        let balance = w.balance
+        if (w.id === oldTx.wallet) balance -= oldTx.type === 'income' ? oldTx.amount : -oldTx.amount
+        if (w.id === newTx.wallet) balance += newTx.type === 'income' ? newTx.amount : -newTx.amount
+        return w.id === oldTx.wallet || w.id === newTx.wallet ? { ...w, balance } : w
+      }))
+      return newTx
+    }))
+  }, [])
+
+  const deleteTransaction = useCallback((id: string) => {
     const tx = transactions.find(t => t.id === id)
     if (!tx) return
     setTransactions(prev => prev.filter(t => t.id !== id))
@@ -163,54 +192,68 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ? { ...w, balance: w.balance - (tx.type === 'income' ? tx.amount : -tx.amount) }
         : w
     ))
-  }
+  }, [transactions])
 
-  const clearTransactions = () => {
+  const clearTransactions = useCallback(() => {
     setTransactions([])
     setWallets(prev => prev.map(w => ({ ...w, balance: 0 })))
-  }
+  }, [])
 
-  const addWallet = (w: Wallet) => setWallets(prev => [...prev, w])
-  const connectWeb3Wallet = (w: ConnectedWallet) => setConnectedWallets(prev => [...prev, w])
-  const disconnectWeb3Wallet = (id: string) => setConnectedWallets(prev => prev.filter(w => w.id !== id))
-  const addPaymentMethod = (m: PaymentMethod) => setPaymentMethods(prev => [...prev, m])
-  const removePaymentMethod = (id: string) => setPaymentMethods(prev => prev.filter(m => m.id !== id))
-  const setDefaultPaymentMethod = (id: string) => setPaymentMethods(prev => prev.map(m => ({ ...m, isDefault: m.id === id })))
-  const updateProfile = (patch: Partial<Profile>) => setProfile(prev => ({ ...prev, ...patch }))
-  const updateSettings = (patch: Partial<Settings>) => setSettings(prev => ({ ...prev, ...patch }))
-  const updateNotification = (key: keyof Settings['notifications'], val: boolean) =>
-    setSettings(prev => ({ ...prev, notifications: { ...prev.notifications, [key]: val } }))
+  const addWallet = useCallback((w: Wallet) => setWallets(prev => [...prev, w]), [])
 
-  const setBudget = (category: string, limit: number) =>
+  const updateWallet = useCallback((id: string, patch: Partial<Wallet>) =>
+    setWallets(prev => prev.map(w => w.id === id ? { ...w, ...patch } : w)), [])
+
+  const deleteWallet = useCallback((id: string) => {
+    setTransactions(prev => prev.filter(t => t.wallet !== id))
+    setWallets(prev => prev.filter(w => w.id !== id))
+  }, [])
+
+  const connectWeb3Wallet = useCallback((w: ConnectedWallet) => setConnectedWallets(prev => [...prev, w]), [])
+  const disconnectWeb3Wallet = useCallback((id: string) => setConnectedWallets(prev => prev.filter(w => w.id !== id)), [])
+  const addPaymentMethod = useCallback((m: PaymentMethod) => setPaymentMethods(prev => [...prev, m]), [])
+  const removePaymentMethod = useCallback((id: string) => setPaymentMethods(prev => prev.filter(m => m.id !== id)), [])
+  const setDefaultPaymentMethod = useCallback((id: string) => setPaymentMethods(prev => prev.map(m => ({ ...m, isDefault: m.id === id }))), [])
+  const updateProfile = useCallback((patch: Partial<Profile>) => setProfile(prev => ({ ...prev, ...patch })), [])
+  const updateSettings = useCallback((patch: Partial<Settings>) => setSettings(prev => ({ ...prev, ...patch })), [])
+  const updateNotification = useCallback((key: keyof Settings['notifications'], val: boolean) =>
+    setSettings(prev => ({ ...prev, notifications: { ...prev.notifications, [key]: val } })), [])
+
+  const setBudget = useCallback((category: string, limit: number) =>
     setBudgets(prev => {
       const exists = prev.find(b => b.category === category)
       if (exists) return prev.map(b => b.category === category ? { ...b, limit } : b)
       return [...prev, { category, limit }]
-    })
+    }), [])
 
-  const removeBudget = (category: string) =>
-    setBudgets(prev => prev.filter(b => b.category !== category))
+  const removeBudget = useCallback((category: string) =>
+    setBudgets(prev => prev.filter(b => b.category !== category)), [])
 
-  const exportCSV = () => {
-    const rows = [['ID', 'Descripción', 'Monto', 'Tipo', 'Categoría', 'Fecha', 'Billetera']]
-    transactions.forEach(t => rows.push([t.id, t.description, String(t.amount), t.type, t.category, t.date, t.wallet]))
-    const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const exportCSV = useCallback(() => {
+    const rows = [['ID', 'Descripción', 'Monto', 'Tipo', 'Categoría', 'Fecha', 'Billetera', 'Notas', 'Recurrente']]
+    transactions.forEach(t => rows.push([
+      t.id, t.description, String(t.amount), t.type, t.category, t.date, t.wallet,
+      t.notes ?? '', t.recurring ? 'Sí' : 'No',
+    ]))
+    const csv = rows.map(r => r.map(c => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = 'zwam-transacciones.csv'; a.click()
+    a.href = url; a.download = `zwam-transacciones-${new Date().toISOString().slice(0, 10)}.csv`; a.click()
     URL.revokeObjectURL(url)
-  }
+  }, [transactions])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('zwam-auth-email')
     setProfile(defaultProfile)
-  }
+  }, [])
 
   return (
     <AppContext.Provider value={{
       transactions, wallets, connectedWallets, paymentMethods, profile, settings, budgets,
-      addTransaction, deleteTransaction, clearTransactions, addWallet, connectWeb3Wallet, disconnectWeb3Wallet,
+      addTransaction, updateTransaction, deleteTransaction, clearTransactions,
+      addWallet, updateWallet, deleteWallet,
+      connectWeb3Wallet, disconnectWeb3Wallet,
       addPaymentMethod, removePaymentMethod, setDefaultPaymentMethod,
       updateProfile, updateSettings, updateNotification,
       setBudget, removeBudget, exportCSV, logout,
