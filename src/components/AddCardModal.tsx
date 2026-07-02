@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Check, CreditCard, Smartphone } from 'lucide-react'
+import { X, Check, CreditCard, Smartphone, AlertCircle, Loader } from 'lucide-react'
 
 export type PaymentMethod = {
   id: string
@@ -53,7 +53,119 @@ const CARD_COLORS = [
   'linear-gradient(135deg,#1d4ed8,#38bdf8)',
 ]
 
+function networkToBrand(network: string): PaymentMethod['brand'] {
+  const n = network.toUpperCase()
+  if (n.includes('VISA')) return 'visa'
+  if (n.includes('MASTER')) return 'mastercard'
+  if (n.includes('AMEX') || n.includes('AMERICAN')) return 'amex'
+  if (n.includes('DISCOVER')) return 'discover'
+  return 'other'
+}
+
+// ── Google Pay via PaymentRequest API ──────────────────────────────────────
+async function checkGooglePayAvailable(): Promise<boolean> {
+  if (!window.PaymentRequest) return false
+  try {
+    const req = new PaymentRequest(
+      [{ supportedMethods: 'https://google.com/pay', data: gpayData() }],
+      { total: { label: 'ZwamWallet', amount: { currency: 'USD', value: '0.00' } } }
+    )
+    return await req.canMakePayment()
+  } catch {
+    return false
+  }
+}
+
+function gpayData() {
+  return {
+    environment: 'TEST',
+    apiVersion: 2,
+    apiVersionMinor: 0,
+    merchantInfo: { merchantName: 'ZwamWallet', merchantId: '01234567890123456789' },
+    allowedPaymentMethods: [{
+      type: 'CARD',
+      parameters: {
+        allowedAuthMethods: ['PAN_ONLY', 'CRYPTOGRAM_3DS'],
+        allowedCardNetworks: ['AMEX', 'DISCOVER', 'MASTERCARD', 'VISA'],
+      },
+      tokenizationSpecification: {
+        type: 'PAYMENT_GATEWAY',
+        parameters: { gateway: 'example', gatewayMerchantId: 'exampleGatewayMerchantId' },
+      },
+    }],
+  }
+}
+
+async function requestGooglePay(): Promise<{ last4: string; brand: PaymentMethod['brand']; holder: string } | null> {
+  if (!window.PaymentRequest) return null
+  const req = new PaymentRequest(
+    [{ supportedMethods: 'https://google.com/pay', data: gpayData() }],
+    { total: { label: 'Vincular con ZwamWallet', amount: { currency: 'USD', value: '0.00' } } }
+  )
+  const result = await req.show()
+  await result.complete('success')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const info = (result as any).details?.paymentMethodData?.info
+  return {
+    last4: info?.cardDetails ?? '****',
+    brand: networkToBrand(info?.cardNetwork ?? ''),
+    holder: 'Google Pay',
+  }
+}
+
+// ── Apple Pay via ApplePaySession ──────────────────────────────────────────
+function checkApplePayAvailable(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return !!(window as any).ApplePaySession && (window as any).ApplePaySession.canMakePayments()
+  } catch {
+    return false
+  }
+}
+
+async function requestApplePay(): Promise<{ last4: string; brand: PaymentMethod['brand']; holder: string } | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const APS = (window as any).ApplePaySession
+  if (!APS) return null
+
+  const request = {
+    countryCode: 'US',
+    currencyCode: 'USD',
+    supportedNetworks: ['visa', 'masterCard', 'amex', 'discover'],
+    merchantCapabilities: ['supports3DS'],
+    total: { label: 'ZwamWallet', type: 'pending', amount: '0.00' },
+  }
+
+  return new Promise((resolve, reject) => {
+    const session = new APS(3, request)
+
+    session.onvalidatemerchant = () => {
+      // Real merchant validation requires a backend endpoint.
+      // Without it, we abort and surface a clear message.
+      session.abort()
+      reject(new Error('MERCHANT_VALIDATION'))
+    }
+
+    session.onpaymentauthorized = (event: any) => {
+      session.completePayment(APS.STATUS_SUCCESS)
+      const pm = event.payment?.token?.paymentMethod
+      resolve({
+        last4: pm?.displayName?.slice(-4) ?? '****',
+        brand: networkToBrand(pm?.network ?? ''),
+        holder: 'Apple Pay',
+      })
+    }
+
+    session.oncancel = () => reject(new Error('USER_CANCELLED'))
+
+    session.begin()
+  })
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
 type Props = { open: boolean; onClose: () => void; onAdd: (m: PaymentMethod) => void }
+
+type DigitalStatus = 'idle' | 'loading' | 'success' | 'error'
 
 export default function AddCardModal({ open, onClose, onAdd }: Props) {
   const [step, setStep] = useState<'choose' | 'card' | 'digital'>('choose')
@@ -67,21 +179,99 @@ export default function AddCardModal({ open, onClose, onAdd }: Props) {
   const [err, setErr] = useState('')
   const [done, setDone] = useState(false)
 
+  const [gpayAvailable, setGpayAvailable] = useState<boolean | null>(null)
+  const [appleAvailable] = useState(() => checkApplePayAvailable())
+  const [gpayStatus, setGpayStatus] = useState<DigitalStatus>('idle')
+  const [appleStatus, setAppleStatus] = useState<DigitalStatus>('idle')
+  const [digitalMsg, setDigitalMsg] = useState('')
+
+  useEffect(() => {
+    if (open && step === 'digital') {
+      checkGooglePayAvailable().then(setGpayAvailable)
+    }
+  }, [open, step])
+
   function reset() {
     setStep('choose'); setCardNum(''); setHolder(''); setExpiry(''); setCvv('')
     setNickname(''); setColor(CARD_COLORS[0]); setErr(''); setDone(false)
+    setGpayAvailable(null); setGpayStatus('idle'); setAppleStatus('idle'); setDigitalMsg('')
   }
 
   function close() { reset(); onClose() }
 
-  function addDigital(brand: 'apple_pay' | 'google_pay') {
-    setDone(true)
+  function saveDigital(brand: 'apple_pay' | 'google_pay', last4 = '', holderName = '') {
     const m: PaymentMethod = {
-      id: `pm${Date.now()}`, category: 'digital', brand,
-      last4: '', holder: '', expiry: '', nickname: BRAND_LOGOS[brand].label,
-      color: BRAND_LOGOS[brand].gradient, isDefault: false,
+      id: `pm${Date.now()}`,
+      category: 'digital',
+      brand,
+      last4,
+      holder: holderName,
+      expiry: '',
+      nickname: last4
+        ? `${BRAND_LOGOS[brand].label} ••••${last4}`
+        : BRAND_LOGOS[brand].label,
+      color: BRAND_LOGOS[brand].gradient,
+      isDefault: false,
     }
-    setTimeout(() => { onAdd(m); reset(); onClose() }, 900)
+    setTimeout(() => { onAdd(m); reset(); onClose() }, 1000)
+  }
+
+  async function handleGooglePay() {
+    if (gpayStatus === 'loading') return
+    setGpayStatus('loading')
+    setDigitalMsg('')
+    try {
+      const info = await requestGooglePay()
+      if (info) {
+        setGpayStatus('success')
+        setDigitalMsg(`Tarjeta ${info.brand !== 'other' ? BRAND_LOGOS[info.brand]?.label : ''} ••••${info.last4} vinculada`)
+        saveDigital('google_pay', info.last4, info.holder)
+      } else {
+        setGpayStatus('error')
+        setDigitalMsg('Google Pay no está disponible en este navegador.')
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg === 'AbortError' || msg.includes('cancel') || msg.includes('abort')) {
+        setGpayStatus('idle')
+        setDigitalMsg('Cancelado.')
+      } else {
+        setGpayStatus('error')
+        setDigitalMsg('No se pudo iniciar Google Pay. Asegúrate de estar en Chrome con una cuenta de Google.')
+      }
+    }
+  }
+
+  async function handleApplePay() {
+    if (appleStatus === 'loading') return
+    setAppleStatus('loading')
+    setDigitalMsg('')
+    try {
+      const info = await requestApplePay()
+      if (info) {
+        setAppleStatus('success')
+        setDigitalMsg(`Apple Pay vinculado con tarjeta ••••${info.last4}`)
+        saveDigital('apple_pay', info.last4, info.holder)
+      } else {
+        setAppleStatus('error')
+        setDigitalMsg('Apple Pay no está disponible.')
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : ''
+      if (msg === 'MERCHANT_VALIDATION') {
+        setAppleStatus('error')
+        setDigitalMsg(
+          'Apple Pay requiere verificación de merchant en un dominio registrado con Apple. ' +
+          'Funciona completamente en la app publicada con un dominio real.'
+        )
+      } else if (msg === 'USER_CANCELLED') {
+        setAppleStatus('idle')
+        setDigitalMsg('Cancelado.')
+      } else {
+        setAppleStatus('error')
+        setDigitalMsg('Apple Pay solo funciona en Safari con Face ID / Touch ID configurado.')
+      }
+    }
   }
 
   function submitCard(e: React.FormEvent) {
@@ -113,7 +303,7 @@ export default function AddCardModal({ open, onClose, onAdd }: Props) {
             <div className="cm-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 {step !== 'choose' && (
-                  <button onClick={() => { setStep('choose'); setErr('') }} className="cm-back">←</button>
+                  <button onClick={() => { setStep('choose'); setErr(''); setDigitalMsg(''); setGpayStatus('idle'); setAppleStatus('idle') }} className="cm-back">←</button>
                 )}
                 <h2>{step === 'choose' ? 'Vincular método de pago' : step === 'digital' ? 'Billetera digital' : 'Agregar tarjeta'}</h2>
               </div>
@@ -121,61 +311,144 @@ export default function AddCardModal({ open, onClose, onAdd }: Props) {
             </div>
 
             <AnimatePresence mode="wait">
+              {/* ── Step: Choose ── */}
               {step === 'choose' && (
                 <motion.div key="choose" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="cm-choose">
                   <p className="cm-hint">Selecciona el tipo de método de pago a vincular</p>
                   <div className="cm-option-grid">
                     <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="cm-option" onClick={() => { setCategory('credit'); setStep('card') }}>
                       <div className="cm-opt-icon" style={{ background: 'rgba(37,99,235,0.15)', color: '#60a5fa' }}><CreditCard size={22} /></div>
-                      <span className="cm-opt-label">Tarjeta de crédito</span>
-                      <span className="cm-opt-sub">Visa, Mastercard, Amex...</span>
+                      <div>
+                        <span className="cm-opt-label">Tarjeta de crédito</span>
+                        <span className="cm-opt-sub">Visa, Mastercard, Amex...</span>
+                      </div>
                     </motion.button>
                     <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="cm-option" onClick={() => { setCategory('debit'); setStep('card') }}>
                       <div className="cm-opt-icon" style={{ background: 'rgba(34,197,94,0.12)', color: '#4ade80' }}><CreditCard size={22} /></div>
-                      <span className="cm-opt-label">Tarjeta de débito</span>
-                      <span className="cm-opt-sub">Cuenta bancaria vinculada</span>
+                      <div>
+                        <span className="cm-opt-label">Tarjeta de débito</span>
+                        <span className="cm-opt-sub">Cuenta bancaria vinculada</span>
+                      </div>
                     </motion.button>
-                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="cm-option" onClick={() => setStep('digital')}>
+                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="cm-option" onClick={() => { setStep('digital'); checkGooglePayAvailable().then(setGpayAvailable) }}>
                       <div className="cm-opt-icon" style={{ background: 'rgba(108,99,255,0.12)', color: '#a78bfa' }}><Smartphone size={22} /></div>
-                      <span className="cm-opt-label">Billetera digital</span>
-                      <span className="cm-opt-sub">Apple Pay, Google Pay</span>
+                      <div>
+                        <span className="cm-opt-label">Billetera digital</span>
+                        <span className="cm-opt-sub">Apple Pay, Google Pay</span>
+                      </div>
                     </motion.button>
                   </div>
                 </motion.div>
               )}
 
+              {/* ── Step: Digital wallets ── */}
               {step === 'digital' && (
                 <motion.div key="digital" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="cm-digital">
-                  {done ? (
-                    <div className="cm-done"><div className="cm-done-icon"><Check size={26} color="var(--green)" /></div><p>¡Método vinculado!</p></div>
-                  ) : (
-                    <>
-                      <p className="cm-hint">Conecta tu billetera digital con un solo toque</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {(['apple_pay', 'google_pay'] as const).map(b => (
-                          <motion.button key={b} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                            onClick={() => addDigital(b)} className="cm-digital-btn"
-                            style={{ background: BRAND_LOGOS[b].gradient }}>
-                            <span className="cm-d-logo">{b === 'apple_pay' ? '' : '𝐆'}</span>
-                            <div>
-                              <div className="cm-d-name">{BRAND_LOGOS[b].label}</div>
-                              <div className="cm-d-sub">Toca para vincular</div>
-                            </div>
-                          </motion.button>
-                        ))}
+                  <p className="cm-hint">Usa la hoja nativa de pago de tu dispositivo para vincular</p>
+
+                  {/* Google Pay */}
+                  <div className="dw-card">
+                    <div className="dw-top">
+                      <div className="dw-logo gpay-logo">
+                        <span style={{ color: '#4285f4', fontWeight: 900 }}>G</span>
+                        <span style={{ color: '#ea4335', fontWeight: 900 }}>o</span>
+                        <span style={{ color: '#fbbc05', fontWeight: 900 }}>o</span>
+                        <span style={{ color: '#4285f4', fontWeight: 900 }}>g</span>
+                        <span style={{ color: '#34a853', fontWeight: 900 }}>l</span>
+                        <span style={{ color: '#ea4335', fontWeight: 900 }}>e</span>
+                        <span style={{ marginLeft: 5, color: '#5f6368', fontWeight: 600 }}>Pay</span>
                       </div>
-                    </>
+                      <div className="dw-status">
+                        {gpayAvailable === null && <span className="dw-checking">Detectando...</span>}
+                        {gpayAvailable === true && <span className="dw-available">● Disponible</span>}
+                        {gpayAvailable === false && <span className="dw-unavailable">● No disponible</span>}
+                      </div>
+                    </div>
+                    <p className="dw-desc">
+                      {gpayAvailable === false
+                        ? 'Requiere Chrome o Android con Google Pay configurado.'
+                        : 'Se abrirá la hoja nativa de Google Pay para elegir tu tarjeta.'}
+                    </p>
+                    <motion.button
+                      whileHover={{ scale: gpayAvailable === false ? 1 : 1.02 }}
+                      whileTap={{ scale: gpayAvailable === false ? 1 : 0.97 }}
+                      className={`dw-btn gpay-btn ${gpayAvailable === false ? 'dw-disabled' : ''}`}
+                      onClick={handleGooglePay}
+                      disabled={gpayAvailable === false || gpayStatus === 'loading' || gpayStatus === 'success'}
+                    >
+                      {gpayStatus === 'loading' && <Loader size={14} className="spin" />}
+                      {gpayStatus === 'success' && <Check size={14} />}
+                      {gpayStatus === 'error' && <AlertCircle size={14} />}
+                      {gpayStatus === 'idle' && <span className="gpay-g">G</span>}
+                      <span>
+                        {gpayStatus === 'loading' ? 'Abriendo Google Pay...' :
+                         gpayStatus === 'success' ? 'Vinculado' :
+                         gpayStatus === 'error' ? 'Reintentar' :
+                         'Vincular con Google Pay'}
+                      </span>
+                    </motion.button>
+                  </div>
+
+                  {/* Apple Pay */}
+                  <div className="dw-card dw-apple">
+                    <div className="dw-top">
+                      <div className="dw-logo apple-logo"> Pay</div>
+                      <div className="dw-status">
+                        {appleAvailable
+                          ? <span className="dw-available">● Disponible</span>
+                          : <span className="dw-unavailable">● Solo en Safari/iOS</span>}
+                      </div>
+                    </div>
+                    <p className="dw-desc">
+                      {appleAvailable
+                        ? 'Se abrirá la hoja nativa de Apple Pay con Face ID / Touch ID.'
+                        : 'Apple Pay solo funciona en Safari en iPhone, iPad o Mac con Touch ID.'}
+                    </p>
+                    <motion.button
+                      whileHover={{ scale: !appleAvailable ? 1 : 1.02 }}
+                      whileTap={{ scale: !appleAvailable ? 1 : 0.97 }}
+                      className={`dw-btn apple-btn ${!appleAvailable ? 'dw-disabled' : ''}`}
+                      onClick={handleApplePay}
+                      disabled={!appleAvailable || appleStatus === 'loading' || appleStatus === 'success'}
+                    >
+                      {appleStatus === 'loading' && <Loader size={14} className="spin" />}
+                      {appleStatus === 'success' && <Check size={14} />}
+                      {appleStatus === 'error' && <AlertCircle size={14} />}
+                      {appleStatus === 'idle' && <span> </span>}
+                      <span>
+                        {appleStatus === 'loading' ? 'Abriendo Apple Pay...' :
+                         appleStatus === 'success' ? 'Vinculado' :
+                         appleStatus === 'error' ? 'Ver detalles' :
+                         'Pagar con  Apple Pay'}
+                      </span>
+                    </motion.button>
+                  </div>
+
+                  {/* Status message */}
+                  {digitalMsg && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`dw-msg ${
+                        gpayStatus === 'success' || appleStatus === 'success' ? 'dw-msg-ok' :
+                        gpayStatus === 'error' || appleStatus === 'error' ? 'dw-msg-err' : 'dw-msg-info'
+                      }`}
+                    >
+                      {(gpayStatus === 'success' || appleStatus === 'success') && <Check size={13} />}
+                      {(gpayStatus === 'error' || appleStatus === 'error') && <AlertCircle size={13} />}
+                      <span>{digitalMsg}</span>
+                    </motion.div>
                   )}
                 </motion.div>
               )}
 
+              {/* ── Step: Card form ── */}
               {step === 'card' && (
                 <motion.div key="card" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
                   {done ? (
                     <div className="cm-done"><div className="cm-done-icon"><Check size={26} color="var(--green)" /></div><p>¡Tarjeta vinculada!</p></div>
                   ) : (
                     <>
-                      {/* Card preview */}
                       <div className="card-preview" style={{ background: color }}>
                         <div className="cp-top">
                           <div className="cp-chip" />
@@ -196,7 +469,6 @@ export default function AddCardModal({ open, onClose, onAdd }: Props) {
                         </div>
                       </div>
 
-                      {/* Color picker */}
                       <div className="cm-colors">
                         {CARD_COLORS.map(c => (
                           <button key={c} type="button" onClick={() => setColor(c)} className={`cm-color-dot ${color === c ? 'active' : ''}`} style={{ background: c }} />
@@ -209,25 +481,28 @@ export default function AddCardModal({ open, onClose, onAdd }: Props) {
                           <div className="cm-input-wrap">
                             <input className="cm-input" placeholder="0000 0000 0000 0000" value={cardNum}
                               onChange={e => { setCardNum(formatCardNum(e.target.value)); setErr('') }}
-                              maxLength={19} autoFocus inputMode="numeric" />
+                              maxLength={19} autoFocus inputMode="numeric" autoComplete="cc-number" />
                             <span className="cm-brand-tag">{BRAND_LOGOS[brand]?.label}</span>
                           </div>
                         </div>
                         <div className="cm-field">
                           <label>Titular de la tarjeta</label>
                           <input className="cm-input" placeholder="Como aparece en la tarjeta" value={holder}
-                            onChange={e => { setHolder(e.target.value.toUpperCase()); setErr('') }} />
+                            onChange={e => { setHolder(e.target.value.toUpperCase()); setErr('') }}
+                            autoComplete="cc-name" />
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                           <div className="cm-field">
                             <label>Expiración</label>
                             <input className="cm-input" placeholder="MM/AA" value={expiry} maxLength={5}
-                              onChange={e => { setExpiry(formatExpiry(e.target.value)); setErr('') }} inputMode="numeric" />
+                              onChange={e => { setExpiry(formatExpiry(e.target.value)); setErr('') }}
+                              inputMode="numeric" autoComplete="cc-exp" />
                           </div>
                           <div className="cm-field">
                             <label>CVV</label>
                             <input className="cm-input" placeholder="•••" value={cvv} maxLength={4} type="password"
-                              onChange={e => { setCvv(e.target.value.replace(/\D/g, '')); setErr('') }} inputMode="numeric" />
+                              onChange={e => { setCvv(e.target.value.replace(/\D/g, '')); setErr('') }}
+                              inputMode="numeric" autoComplete="cc-csc" />
                           </div>
                           <div className="cm-field">
                             <label>Alias (opcional)</label>
@@ -260,8 +535,8 @@ export default function AddCardModal({ open, onClose, onAdd }: Props) {
 }
 
 export const addCardStyles = `
-  .cm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 200; }
-  .cm-modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 18px; padding: 26px; width: 480px; max-width: calc(100vw - 32px); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+  .cm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+  .cm-modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 18px; padding: 26px; width: 480px; max-width: 100%; max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
   .cm-header { display: flex; align-items: center; justify-content: space-between; }
   .cm-header h2 { font-size: 16px; font-weight: 700; }
   .cm-back { background: var(--bg-card); border: 1px solid var(--border); border-radius: 7px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-secondary); font-size: 14px; }
@@ -270,18 +545,43 @@ export const addCardStyles = `
 
   .cm-choose { display: flex; flex-direction: column; gap: 14px; }
   .cm-option-grid { display: flex; flex-direction: column; gap: 8px; }
-  .cm-option { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: border-color 0.15s; text-align: left; }
+  .cm-option { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: border-color 0.15s; text-align: left; width: 100%; -webkit-tap-highlight-color: transparent; }
   .cm-option:hover { border-color: var(--accent); }
   .cm-opt-icon { width: 44px; height: 44px; border-radius: 11px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .cm-opt-label { font-size: 14px; font-weight: 600; color: var(--text-primary); display: block; }
   .cm-opt-sub { font-size: 12px; color: var(--text-secondary); display: block; margin-top: 2px; }
 
-  .cm-digital { display: flex; flex-direction: column; gap: 16px; }
-  .cm-digital-btn { display: flex; align-items: center; gap: 16px; border: none; border-radius: 13px; padding: 18px 20px; cursor: pointer; transition: opacity 0.15s; }
-  .cm-digital-btn:hover { opacity: 0.9; }
-  .cm-d-logo { font-size: 28px; flex-shrink: 0; color: white; }
-  .cm-d-name { font-size: 15px; font-weight: 700; color: white; }
-  .cm-d-sub { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+  /* Digital wallets */
+  .cm-digital { display: flex; flex-direction: column; gap: 14px; }
+  .dw-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .dw-apple { border-color: rgba(255,255,255,0.08); }
+  .dw-top { display: flex; align-items: center; justify-content: space-between; }
+  .dw-logo { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 0; letter-spacing: -0.5px; }
+  .gpay-logo { font-size: 15px; }
+  .apple-logo { color: var(--text-primary); font-size: 16px; font-weight: 700; font-family: -apple-system, sans-serif; letter-spacing: -0.3px; }
+  .dw-status { font-size: 11px; font-weight: 600; }
+  .dw-available { color: var(--green); }
+  .dw-unavailable { color: var(--text-dim); }
+  .dw-checking { color: var(--text-dim); }
+  .dw-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .dw-btn {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    border: none; border-radius: 10px; padding: 13px 16px;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .gpay-btn { background: #000; color: white; }
+  .apple-btn { background: #000; color: white; }
+  .dw-disabled { opacity: 0.4; cursor: not-allowed; }
+  .gpay-g { font-size: 16px; font-weight: 900; color: #4285f4; }
+  .spin { animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .dw-msg { display: flex; align-items: flex-start; gap: 8px; border-radius: 9px; padding: 10px 12px; font-size: 12px; line-height: 1.5; }
+  .dw-msg-ok { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); color: var(--green); }
+  .dw-msg-err { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
+  .dw-msg-info { background: var(--accent-dim); border: 1px solid rgba(108,99,255,0.2); color: var(--accent-light); }
 
   .card-preview {
     border-radius: 14px; padding: 20px 22px; height: 160px;
@@ -307,16 +607,17 @@ export const addCardStyles = `
   .cm-input-wrap { position: relative; }
   .cm-input {
     background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
-    padding: 9px 12px; color: var(--text-primary); font-size: 13px; outline: none;
+    padding: 10px 12px; color: var(--text-primary); font-size: 14px; outline: none;
     font-family: inherit; width: 100%; box-sizing: border-box; transition: border-color 0.15s;
+    -webkit-appearance: none;
   }
   .cm-input:focus { border-color: var(--accent); }
   .cm-brand-tag { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); font-size: 11px; font-weight: 700; color: var(--text-dim); }
   .cm-err { font-size: 12px; color: #ef4444; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 7px; padding: 7px 11px; }
   .cm-type-tabs { display: flex; gap: 4px; background: var(--bg-card); border-radius: 8px; padding: 3px; }
-  .cm-type-tab { flex: 1; padding: 6px; border-radius: 6px; border: none; background: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .cm-type-tab { flex: 1; padding: 7px; border-radius: 6px; border: none; background: none; color: var(--text-secondary); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
   .cm-type-tab.active { background: var(--accent); color: white; }
-  .cm-submit { display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .cm-submit { display: flex; align-items: center; justify-content: center; gap: 7px; background: var(--accent); color: white; border: none; padding: 13px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
   .cm-done { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px 0; }
   .cm-done-icon { width: 60px; height: 60px; border-radius: 50%; background: rgba(34,197,94,0.12); display: flex; align-items: center; justify-content: center; }
   .cm-done p { font-size: 15px; font-weight: 600; color: var(--text-primary); }
