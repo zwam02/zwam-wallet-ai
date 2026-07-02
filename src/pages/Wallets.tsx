@@ -399,13 +399,21 @@ export default function Wallets() {
       />
 
       <style>{`
-        .page { padding: 24px 28px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
-        .page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; }
-        .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+        .page { padding: 20px 24px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+        .page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
+        .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
         .page-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
-        .btn-primary { display: flex; align-items: center; gap: 6px; background: var(--accent); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-primary { display: flex; align-items: center; gap: 6px; background: var(--accent); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .btn-web3 { display: flex; align-items: center; gap: 6px; background: var(--bg-card); color: var(--text-secondary); border: 1px solid var(--border); padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
         .btn-web3:hover { border-color: var(--accent); color: var(--accent-light); background: var(--accent-dim); }
+        @media (max-width: 768px) {
+          .page { padding: 16px 14px; }
+          .wallets-grid { grid-template-columns: 1fr; }
+          .web3-grid { grid-template-columns: 1fr; }
+          .pm-cards-grid { grid-template-columns: 1fr; }
+          .pm-digital-grid { grid-template-columns: 1fr; }
+          .pm-card-wrap { height: 140px; }
+        }
 
         /* Tabs */
         .page-tabs { display: flex; gap: 3px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 3px; flex-shrink: 0; align-self: flex-start; }

@@ -120,19 +120,19 @@ export default function Transactions() {
       <NewTransactionModal open={modalOpen} onClose={() => setModalOpen(false)} onAdd={tx => { addTransaction(tx); setModalOpen(false) }} />
 
       <style>{`
-        .page { padding: 24px 28px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+        .page { padding: 20px 24px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
         .page-header { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; }
-        .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-        .page-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
-        .btn-primary { display: flex; align-items: center; gap: 6px; background: var(--accent); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+        .page-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 3px; }
+        .btn-primary { display: flex; align-items: center; gap: 6px; background: var(--accent); color: white; border: none; padding: 8px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent; }
         .filters-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
-        .search-box { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; flex: 1; min-width: 180px; }
-        .search-input { background: none; border: none; outline: none; color: var(--text-primary); font-size: 13px; width: 100%; }
+        .search-box { display: flex; align-items: center; gap: 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; flex: 1; min-width: 140px; }
+        .search-input { background: none; border: none; outline: none; color: var(--text-primary); font-size: 14px; width: 100%; }
         .clear-search { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 12px; padding: 0 2px; }
         .filter-tabs { display: flex; gap: 3px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
-        .filter-tab { padding: 5px 12px; border-radius: 6px; border: none; background: none; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+        .filter-tab { padding: 6px 12px; border-radius: 6px; border: none; background: none; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
         .filter-tab.active { background: var(--accent); color: white; }
-        .category-select { display: flex; align-items: center; gap: 7px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 7px 11px; }
+        .category-select { display: flex; align-items: center; gap: 7px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; }
         .select-native { background: none; border: none; outline: none; color: var(--text-primary); font-size: 13px; cursor: pointer; }
         .tx-table { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow-y: auto; flex: 1; min-height: 0; }
         .tx-table-header { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 40px; padding: 10px 14px; font-size: 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg-card); z-index: 1; }
@@ -150,13 +150,33 @@ export default function Transactions() {
         .tx-date { color: var(--text-dim); font-size: 12px; }
         .tx-amt { text-align: right; font-weight: 600; font-family: 'Space Grotesk', sans-serif; }
         .tx-actions { display: flex; align-items: center; justify-content: center; }
-        .btn-delete { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 4px; border-radius: 5px; opacity: 0; transition: opacity 0.15s, color 0.15s; display: flex; align-items: center; }
+        .btn-delete { background: none; border: none; color: var(--text-dim); cursor: pointer; padding: 6px; border-radius: 5px; opacity: 0; transition: opacity 0.15s, color 0.15s; display: flex; align-items: center; }
         .btn-delete:hover { color: var(--red); }
         .confirm-delete { display: flex; gap: 4px; }
-        .btn-confirm-del { background: var(--red); color: white; border: none; border-radius: 5px; padding: 3px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-        .btn-cancel-del { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 5px; padding: 3px 8px; font-size: 11px; cursor: pointer; }
+        .btn-confirm-del { background: var(--red); color: white; border: none; border-radius: 5px; padding: 4px 8px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .btn-cancel-del { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px; font-size: 11px; cursor: pointer; }
         .empty-state { padding: 48px; text-align: center; color: var(--text-dim); display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .btn-reset { background: var(--accent-dim); color: var(--accent-light); border: 1px solid rgba(108,99,255,0.3); border-radius: 7px; padding: 7px 16px; font-size: 12px; font-weight: 600; cursor: pointer; }
+
+        @media (max-width: 768px) {
+          .page { padding: 16px 14px; }
+          .page-subtitle { display: none; }
+          .category-select { display: none; }
+          .filter-tab { padding: 6px 10px; font-size: 11px; }
+          .tx-table-header { display: none; }
+          .tx-row {
+            grid-template-columns: 1fr auto;
+            grid-template-rows: auto auto;
+            gap: 2px 8px;
+            padding: 12px 14px;
+          }
+          .tx-desc-cell { grid-column: 1; grid-row: 1; }
+          .tx-amt { grid-column: 2; grid-row: 1; font-size: 14px; }
+          .tag { grid-column: 1; grid-row: 2; font-size: 10px; }
+          .tx-wallet, .tx-date { display: none; }
+          .tx-actions { grid-column: 2; grid-row: 2; justify-content: flex-end; }
+          .btn-delete { opacity: 1; }
+        }
         ${modalStyles}
       `}</style>
     </div>

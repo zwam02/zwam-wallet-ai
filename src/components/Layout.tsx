@@ -8,12 +8,21 @@ const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/transactions', icon: ArrowLeftRight, label: 'Movimientos' },
   { to: '/wallet', icon: Wallet, label: 'Billeteras' },
-  { to: '/insights', icon: Sparkles, label: 'IA Insights' },
+  { to: '/insights', icon: Sparkles, label: 'Insights' },
   { to: '/plans', icon: CreditCard, label: 'Planes' },
   { to: '/settings', icon: Settings, label: 'Ajustes' },
 ]
 
+const mobileNavItems = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Inicio' },
+  { to: '/transactions', icon: ArrowLeftRight, label: 'Movimientos' },
+  { to: '/wallet', icon: Wallet, label: 'Billeteras' },
+  { to: '/insights', icon: Sparkles, label: 'Insights' },
+  { to: '/settings', icon: Settings, label: 'Ajustes' },
+]
+
 function getInitials(name: string) {
+  if (!name) return 'U'
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
@@ -23,6 +32,7 @@ export default function Layout({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div className="layout">
+      {/* Desktop sidebar */}
       <aside className="sidebar">
         <div className="sidebar-logo">
           <div className="logo-icon">Z</div>
@@ -57,7 +67,7 @@ export default function Layout({ onLogout }: { onLogout: () => void }) {
               {getInitials(profile.name)}
             </div>
             <div className="user-info">
-              <span className="user-name">{profile.name}</span>
+              <span className="user-name">{profile.name || 'Usuario'}</span>
               <span className="user-plan">{profile.plan} Plan</span>
             </div>
           </Link>
@@ -69,10 +79,22 @@ export default function Layout({ onLogout }: { onLogout: () => void }) {
         </div>
       </aside>
 
+      {/* Main content */}
       <main className="main-content">
         <Outlet />
       </main>
 
+      {/* Mobile bottom nav */}
+      <nav className="mobile-nav">
+        {mobileNavItems.map(({ to, icon: Icon, label }) => (
+          <NavLink key={to} to={to} className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}>
+            <Icon size={20} />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Logout confirm modal */}
       <AnimatePresence>
         {showLogout && (
           <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowLogout(false)}>
@@ -93,6 +115,8 @@ export default function Layout({ onLogout }: { onLogout: () => void }) {
 
       <style>{`
         .layout { display: flex; height: 100vh; overflow: hidden; }
+
+        /* ── Desktop sidebar ── */
         .sidebar {
           width: 220px; flex-shrink: 0;
           background: var(--bg-secondary);
@@ -142,7 +166,6 @@ export default function Layout({ onLogout }: { onLogout: () => void }) {
           width: 32px; height: 32px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
           font-size: 12px; font-weight: 700; color: white; flex-shrink: 0;
-          transition: background 0.3s;
         }
         .user-info { display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
         .user-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -155,16 +178,53 @@ export default function Layout({ onLogout }: { onLogout: () => void }) {
           transition: all 0.15s;
         }
         .logout-btn:hover { color: #ef4444; border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.08); }
-        .main-content { flex: 1; overflow: hidden; background: var(--bg-primary); }
 
+        /* ── Main content ── */
+        .main-content { flex: 1; overflow: hidden; background: var(--bg-primary); height: 100%; }
+
+        /* ── Mobile bottom nav (hidden on desktop) ── */
+        .mobile-nav { display: none; }
+
+        /* ── Modal ── */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 300; }
-        .logout-modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 320px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+        .logout-modal { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 16px; padding: 28px; width: 320px; max-width: calc(100vw - 32px); display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
         .logout-icon { width: 52px; height: 52px; border-radius: 50%; background: var(--bg-card); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; }
         .logout-modal h3 { font-size: 16px; font-weight: 700; }
         .logout-modal p { font-size: 13px; color: var(--text-secondary); }
         .logout-actions { display: flex; gap: 8px; width: 100%; }
         .btn-cancel { flex: 1; padding: 10px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 9px; color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; }
         .btn-logout-confirm { flex: 1; padding: 10px; background: #ef4444; border: none; border-radius: 9px; color: white; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+        /* ── Mobile styles ── */
+        @media (max-width: 768px) {
+          .layout { flex-direction: column; }
+          .sidebar { display: none; }
+          .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 68px;
+          }
+          .mobile-nav {
+            display: flex;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            z-index: 100;
+            padding-bottom: env(safe-area-inset-bottom);
+          }
+          .mobile-nav-item {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            gap: 3px; padding: 10px 4px 8px;
+            color: var(--text-dim); text-decoration: none;
+            font-size: 10px; font-weight: 600;
+            transition: color 0.15s;
+            -webkit-tap-highlight-color: transparent;
+          }
+          .mobile-nav-item.active { color: var(--accent-light); }
+          .mobile-nav-item svg { flex-shrink: 0; }
+        }
       `}</style>
     </div>
   )

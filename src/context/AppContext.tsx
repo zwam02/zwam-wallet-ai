@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { transactions as initialTxs, wallets as initialWallets, type Transaction, type Wallet } from '../data/mock'
+import { type Transaction, type Wallet } from '../data/mock'
 import type { ConnectedWallet } from '../components/ConnectWalletModal'
 import type { PaymentMethod } from '../components/AddCardModal'
 
@@ -54,10 +54,12 @@ type AppContextType = {
   logout: () => void
 }
 
+const DATA_VERSION = '3'
+
 const defaultProfile: Profile = {
-  name: 'Juan Díaz',
-  email: 'juan@zwam.ai',
-  plan: 'Pro',
+  name: '',
+  email: '',
+  plan: 'Free',
   avatarColor: '#6c63ff',
   bio: '',
   phone: '',
@@ -94,6 +96,11 @@ function applyTheme(theme: 'dark' | 'light') {
   }
 }
 
+function clearOldData() {
+  const keys = ['zwam-txs', 'zwam-wallets', 'zwam-web3', 'zwam-payments', 'zwam-profile', 'zwam-budgets', 'zwam-settings']
+  keys.forEach(k => localStorage.removeItem(k))
+}
+
 function load<T>(key: string, fallback: T): T {
   try {
     const s = localStorage.getItem(key)
@@ -111,19 +118,19 @@ function loadArr<T>(key: string, fallback: T[]): T[] {
 const AppContext = createContext<AppContextType | null>(null)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [transactions, setTransactions] = useState<Transaction[]>(() => loadArr('zwam-txs', initialTxs))
-  const [wallets, setWallets] = useState<Wallet[]>(() => loadArr('zwam-wallets', initialWallets))
+  // Clear old data if version changed
+  if (localStorage.getItem('zwam-version') !== DATA_VERSION) {
+    clearOldData()
+    localStorage.setItem('zwam-version', DATA_VERSION)
+  }
+
+  const [transactions, setTransactions] = useState<Transaction[]>(() => loadArr('zwam-txs', []))
+  const [wallets, setWallets] = useState<Wallet[]>(() => loadArr('zwam-wallets', []))
   const [connectedWallets, setConnectedWallets] = useState<ConnectedWallet[]>(() => loadArr('zwam-web3', []))
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(() => loadArr('zwam-payments', []))
   const [profile, setProfile] = useState<Profile>(() => load('zwam-profile', defaultProfile))
   const [settings, setSettings] = useState<Settings>(() => load('zwam-settings', defaultSettings))
-  const [budgets, setBudgets] = useState<Budget[]>(() => loadArr('zwam-budgets', [
-    { category: 'Alimentación', limit: 400 },
-    { category: 'Vivienda', limit: 1200 },
-    { category: 'Entretenimiento', limit: 100 },
-    { category: 'Transporte', limit: 150 },
-    { category: 'Salud', limit: 200 },
-  ]))
+  const [budgets, setBudgets] = useState<Budget[]>(() => loadArr('zwam-budgets', []))
 
   useEffect(() => { localStorage.setItem('zwam-txs', JSON.stringify(transactions)) }, [transactions])
   useEffect(() => { localStorage.setItem('zwam-wallets', JSON.stringify(wallets)) }, [wallets])

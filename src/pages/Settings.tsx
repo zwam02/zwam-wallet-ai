@@ -371,7 +371,7 @@ export default function Settings() {
       </div>
 
       <style>{`
-        .page { padding: 24px 28px; height: 100vh; box-sizing: border-box; overflow-y: auto; }
+        .page { padding: 20px 24px; height: 100%; box-sizing: border-box; overflow-y: auto; }
         .page-header { margin-bottom: 14px; }
         .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
         .page-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
@@ -410,6 +410,19 @@ export default function Settings() {
         .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-bottom: 24px; }
         .settings-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
         .budget-card { grid-column: span 2; }
+        @media (max-width: 768px) {
+          .page { padding: 16px 14px; }
+          .settings-profile { flex-wrap: wrap; gap: 10px; }
+          .settings-grid { grid-template-columns: 1fr; }
+          .budget-card { grid-column: span 1; }
+          .field-row { grid-template-columns: 1fr; }
+          .budget-list { grid-template-columns: 1fr; }
+          .summary-grid { grid-template-columns: repeat(2, 1fr); }
+          .settings-row { flex-wrap: wrap; gap: 8px; }
+          .theme-tabs { flex-shrink: 0; }
+          .add-budget-row { flex-wrap: wrap; }
+          .budget-limit-input { width: 100px; }
+        }
         .settings-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
         .settings-icon { width: 26px; height: 26px; background: var(--accent-dim); color: var(--accent-light); border-radius: 6px; display: flex; align-items: center; justify-content: center; }
         .settings-card-header h3 { font-size: 13px; font-weight: 600; }

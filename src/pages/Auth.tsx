@@ -82,6 +82,11 @@ export default function Auth({ onAuth }: Props) {
 
       <div className="auth-right">
         <motion.div className="auth-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+          <div className="auth-mobile-brand">
+            <div className="auth-logo">Z</div>
+            <span className="auth-logo-text">ZwamWallet</span>
+          </div>
+
           <div className="auth-tabs">
             {(['login', 'register'] as const).map(t => (
               <button key={t} onClick={() => { setTab(t); setError('') }} className={`auth-tab ${tab === t ? 'active' : ''}`}>
@@ -95,17 +100,17 @@ export default function Auth({ onAuth }: Props) {
               {tab === 'register' && (
                 <div className="auth-field">
                   <label>Nombre completo</label>
-                  <input value={name} onChange={e => { setName(e.target.value); setError('') }} placeholder="Juan García" autoFocus className="auth-input" />
+                  <input value={name} onChange={e => { setName(e.target.value); setError('') }} placeholder="Juan García" autoFocus className="auth-input" autoComplete="name" />
                 </div>
               )}
               <div className="auth-field">
                 <label>Email</label>
-                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError('') }} placeholder="juan@email.com" autoFocus={tab === 'login'} className="auth-input" />
+                <input type="email" value={email} onChange={e => { setEmail(e.target.value); setError('') }} placeholder="juan@email.com" autoFocus={tab === 'login'} className="auth-input" autoComplete="email" />
               </div>
               <div className="auth-field">
                 <label>Contraseña</label>
                 <div className="pass-wrap">
-                  <input type={showPass ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="Mínimo 6 caracteres" className="auth-input pass-input" />
+                  <input type={showPass ? 'text' : 'password'} value={password} onChange={e => { setPassword(e.target.value); setError('') }} placeholder="Mínimo 6 caracteres" className="auth-input pass-input" autoComplete={tab === 'login' ? 'current-password' : 'new-password'} />
                   <button type="button" onClick={() => setShowPass(p => !p)} className="pass-toggle">
                     {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
@@ -141,9 +146,8 @@ export default function Auth({ onAuth }: Props) {
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         .auth-root {
-          display: flex; min-height: 100vh; height: 100vh;
+          display: flex; min-height: 100vh; min-height: 100dvh;
           background: var(--bg-primary); font-family: 'Inter', 'Space Grotesk', sans-serif;
-          overflow: hidden;
         }
         .auth-left {
           flex: 1.1; background: var(--bg-secondary);
@@ -183,6 +187,7 @@ export default function Auth({ onAuth }: Props) {
           background: var(--bg-card); border: 1px solid var(--border);
           border-radius: 18px; padding: 32px; display: flex; flex-direction: column; gap: 24px;
         }
+        .auth-mobile-brand { display: none; align-items: center; gap: 10px; justify-content: center; }
         .auth-tabs { display: flex; background: var(--bg-secondary); border-radius: 10px; padding: 3px; gap: 2px; }
         .auth-tab {
           flex: 1; padding: 8px; border-radius: 8px; border: none;
@@ -195,9 +200,9 @@ export default function Auth({ onAuth }: Props) {
         .auth-field label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
         .auth-input {
           background: var(--bg-secondary); border: 1px solid var(--border);
-          border-radius: 9px; padding: 11px 14px; color: var(--text-primary);
-          font-size: 14px; outline: none; font-family: inherit; width: 100%;
-          transition: border-color 0.15s;
+          border-radius: 9px; padding: 13px 14px; color: var(--text-primary);
+          font-size: 16px; outline: none; font-family: inherit; width: 100%;
+          transition: border-color 0.15s; -webkit-appearance: none;
         }
         .auth-input:focus { border-color: var(--accent); }
         .pass-wrap { position: relative; }
@@ -205,14 +210,14 @@ export default function Auth({ onAuth }: Props) {
         .pass-toggle {
           position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
           background: none; border: none; color: var(--text-dim); cursor: pointer;
-          display: flex; align-items: center;
+          display: flex; align-items: center; padding: 4px;
         }
         .auth-error { font-size: 12px; color: #ef4444; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); border-radius: 7px; padding: 8px 12px; }
         .auth-submit {
           display: flex; align-items: center; justify-content: center; gap: 7px;
           background: var(--accent); color: white; border: none;
-          padding: 12px; border-radius: 10px; font-size: 14px; font-weight: 700;
-          cursor: pointer; transition: opacity 0.15s;
+          padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 700;
+          cursor: pointer; transition: opacity 0.15s; -webkit-tap-highlight-color: transparent;
         }
         .auth-submit.loading { opacity: 0.7; cursor: default; }
         .auth-spinner {
@@ -224,6 +229,21 @@ export default function Auth({ onAuth }: Props) {
         .auth-switch { font-size: 12px; color: var(--text-secondary); text-align: center; }
         .auth-switch button { background: none; border: none; color: var(--accent-light); font-size: 12px; font-weight: 600; cursor: pointer; }
         .auth-free-note { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-dim); justify-content: center; }
+
+        @media (max-width: 640px) {
+          .auth-root { flex-direction: column; }
+          .auth-left { display: none; }
+          .auth-right {
+            flex: 1; padding: 20px 16px;
+            align-items: flex-start;
+            padding-top: 40px;
+          }
+          .auth-card {
+            border: none; background: transparent; padding: 0;
+            gap: 20px;
+          }
+          .auth-mobile-brand { display: flex; margin-bottom: 8px; }
+        }
       `}</style>
     </div>
   )

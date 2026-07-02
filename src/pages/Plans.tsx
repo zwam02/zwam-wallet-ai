@@ -228,13 +228,19 @@ export default function Plans() {
       </AnimatePresence>
 
       <style>{`
-        .plans-page { padding: 24px 28px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
-        .plans-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .plans-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-        .plans-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
+        .plans-page { padding: 20px 24px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; }
+        .plans-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
+        .plans-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+        .plans-sub { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
         .current-badge { display: flex; align-items: center; gap: 7px; background: var(--accent-dim); color: var(--accent-light); border: 1px solid rgba(108,99,255,0.3); padding: 7px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; }
 
         .plans-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; flex-shrink: 0; }
+        @media (max-width: 768px) {
+          .plans-page { padding: 16px 14px; }
+          .plans-grid { grid-template-columns: 1fr; }
+          .faq-grid { grid-template-columns: 1fr; }
+          .confirm-modal { width: calc(100vw - 32px); }
+        }
         .plan-card {
           background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;
           padding: 22px; display: flex; flex-direction: column; gap: 12px;

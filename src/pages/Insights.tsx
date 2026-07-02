@@ -234,13 +234,19 @@ export default function Insights() {
       </div>
 
       <style>{`
-        .page { padding: 20px 24px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+        .page { padding: 20px 24px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
         .page-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-        .page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-        .page-subtitle { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+        .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+        .page-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
         .ai-badge { display: flex; align-items: center; gap: 6px; background: var(--accent-dim); border: 1px solid rgba(108,99,255,0.3); color: var(--accent-light); padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
         .insights-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; overflow: hidden; }
         .col-left, .col-right { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 2px; }
+        @media (max-width: 768px) {
+          .page { padding: 16px 14px; overflow-y: auto; overflow-x: hidden; }
+          .insights-layout { grid-template-columns: 1fr; overflow: visible; flex: none; }
+          .col-left, .col-right { overflow-y: visible; }
+          .ai-badge span { display: none; }
+        }
         .section-label { display: flex; align-items: center; gap: 7px; }
         .section-label span { font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
         .insight-card { display: flex; gap: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 11px; padding: 13px; }
